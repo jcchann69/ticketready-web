@@ -1,0 +1,20 @@
+{
+  "name": "ticketready-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "configure:stripe": "powershell -ExecutionPolicy Bypass -File scripts/configure-stripe.ps1",
+    "setup:stripe": "node scripts/setup-stripe.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "stripe": "^22.2.0"
+  }
+}

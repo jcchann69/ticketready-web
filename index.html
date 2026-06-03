@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TicketReady - Service Desk Emulator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__shade"></div>
+      <div class="hero__content">
+        <div>
+          <p class="eyebrow">Service Desk Emulator</p>
+          <h1>TicketReady</h1>
+          <p class="hero__copy">
+            Practice real support tickets, build job-ready instincts, and turn each resolved case into proof you can show.
+          </p>
+        </div>
+        <div class="hero__actions" aria-label="Primary actions">
+          <button class="button button--primary" id="startShiftBtn" type="button">Start Shift</button>
+          <button class="button button--ghost" id="creatorModeBtn" type="button">Creator Clip</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="training-panel" aria-labelledby="trainingTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Shift 01</p>
+            <h2 id="trainingTitle">Corporate IT Support Queue</h2>
+          </div>
+          <div class="mode-tabs" role="tablist" aria-label="Training modes">
+            <button class="tab is-active" data-mode="guided" type="button">Guided</button>
+            <button class="tab" data-mode="interview" type="button">Interview</button>
+            <button class="tab" data-mode="speedrun" type="button">Speedrun</button>
+          </div>
+        </div>
+
+        <div class="stats-strip" aria-label="Progress">
+          <div class="stat">
+            <span class="stat__label">XP</span>
+            <strong id="xpStat">0</strong>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Solved</span>
+            <strong id="solvedStat">0</strong>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Best</span>
+            <strong id="bestStat">0</strong>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Readiness</span>
+            <strong id="readyStat">0%</strong>
+          </div>
+        </div>
+
+        <div class="sim-grid">
+          <aside class="queue-pane" aria-labelledby="queueTitle">
+            <div class="pane-title">
+              <h3 id="queueTitle">Incoming Tickets</h3>
+              <button class="icon-button" id="randomTicketBtn" type="button" title="Load random ticket" aria-label="Load random ticket">RND</button>
+            </div>
+            <div id="ticketQueue" class="ticket-list"></div>
+          </aside>
+
+          <section class="ticket-pane" aria-live="polite">
+            <div class="ticket-topline">
+              <div>
+                <span class="ticket-id" id="ticketId">SD-0000</span>
+                <h3 id="ticketTitle">Loading ticket</h3>
+              </div>
+              <div class="sla-pill" id="slaPill">SLA 00:00</div>
+            </div>
+
+            <div class="ticket-meta" id="ticketMeta"></div>
+            <p class="customer-note" id="customerNote"></p>
+
+            <div class="signal-row" id="signalRow" aria-label="Ticket signals"></div>
+
+            <div class="workspace-grid">
+              <form class="triage-form" id="triageForm">
+                <div class="field-pair">
+                  <label for="categorySelect">Category</label>
+                  <select id="categorySelect" name="category">
+                    <option value="">Choose category</option>
+                    <option>Incident</option>
+                    <option>Service Request</option>
+                    <option>Access</option>
+                    <option>Security</option>
+                    <option>Network</option>
+                    <option>Hardware</option>
+                  </select>
+                </div>
+
+                <div class="field-pair">
+                  <label for="prioritySelect">Priority</label>
+                  <select id="prioritySelect" name="priority">
+                    <option value="">Choose priority</option>
+                    <option>P1</option>
+                    <option>P2</option>
+                    <option>P3</option>
+                    <option>P4</option>
+                  </select>
+                </div>
+
+                <fieldset>
+                  <legend>First response tone</legend>
+                  <div class="segmented" id="replyTone">
+                    <button class="segment is-active" data-tone="professional" type="button">Clear</button>
+                    <button class="segment" data-tone="too_fast" type="button">Fast</button>
+                    <button class="segment" data-tone="too_casual" type="button">Casual</button>
+                  </div>
+                </fieldset>
+              </form>
+
+              <div class="kb-pane">
+                <div class="pane-title">
+                  <h4>Knowledge Base</h4>
+                </div>
+                <ul id="kbList"></ul>
+              </div>
+            </div>
+
+            <div class="actions-section">
+              <div class="pane-title">
+                <h4>Pick up to 4 actions</h4>
+                <span id="actionCount">0/4</span>
+              </div>
+              <div class="action-bank" id="actionBank"></div>
+            </div>
+
+            <div class="resolution-row">
+              <button class="button button--primary" id="submitTicketBtn" type="button">Submit Resolution</button>
+              <button class="button button--secondary" id="nextTicketBtn" type="button">Next Ticket</button>
+            </div>
+
+            <div class="result-panel" id="resultPanel" hidden>
+              <div class="score-ring">
+                <span id="scoreValue">0</span>
+                <small>/100</small>
+              </div>
+              <div>
+                <h4 id="resultTitle">Result</h4>
+                <p id="resultSummary"></p>
+                <ul id="coachList"></ul>
+              </div>
+            </div>
+
+            <section class="value-lab" aria-labelledby="valueLabTitle">
+              <div class="pane-title">
+                <div>
+                  <p class="eyebrow">Pro Outcome</p>
+                  <h3 id="valueLabTitle">Job Evidence Lab</h3>
+                </div>
+                <span class="badge">Subscriber</span>
+              </div>
+              <div class="outcome-grid">
+                <article class="outcome-card">
+                  <span class="outcome-card__label">Resume Evidence</span>
+                  <p id="evidenceLog">Complete a ticket to generate a job-ready proof entry.</p>
+                  <button class="button button--secondary compact-button" id="copyEvidenceBtn" type="button">Copy Evidence</button>
+                </article>
+                <article class="outcome-card">
+                  <span class="outcome-card__label">Interview Practice</span>
+                  <p id="interviewPrompt">Your next interview prompt appears after a scored resolution.</p>
+                </article>
+                <article class="outcome-card">
+                  <span class="outcome-card__label">Next Drill</span>
+                  <p id="nextDrill">The app will recommend the next skill to train from your weak spots.</p>
+                </article>
+              </div>
+            </section>
+          </section>
+        </div>
+      </section>
+
+      <aside class="side-rail">
+        <section class="career-panel" aria-labelledby="careerTitle">
+          <div class="pane-title">
+            <h2 id="careerTitle">Career Track</h2>
+          </div>
+          <div class="readiness-meter" aria-label="Job readiness meter">
+            <div class="meter-track">
+              <span id="meterFill"></span>
+            </div>
+            <p id="readinessCopy">Resolve tickets to build your help desk readiness score.</p>
+          </div>
+          <div class="skill-grid" id="skillGrid"></div>
+        </section>
+
+        <section class="creator-panel" aria-labelledby="creatorTitle">
+          <div class="pane-title">
+            <h2 id="creatorTitle">Creator Clip</h2>
+            <span class="badge">TikTok</span>
+          </div>
+          <p id="clipHook">Load a ticket to generate a short clip hook.</p>
+          <ol id="clipBeats"></ol>
+          <button class="button button--secondary full-width" id="copyClipBtn" type="button">Copy Clip Script</button>
+          <p class="fine-print" id="copyStatus" aria-live="polite"></p>
+        </section>
+
+        <section class="subscription-panel" aria-labelledby="subscriptionTitle">
+          <div class="pane-title">
+            <h2 id="subscriptionTitle">Pro Lab</h2>
+            <span class="badge" id="proStatusBadge">Free</span>
+          </div>
+          <div class="plan-summary">
+            <strong>What paid users get</strong>
+            <span id="planSummaryCopy">Practice, proof, and interview confidence every week.</span>
+          </div>
+          <ul class="pro-list">
+            <li>30-day help desk ramp</li>
+            <li>200-ticket job pack</li>
+            <li>Resume evidence log</li>
+            <li>Mock interview coach</li>
+            <li>Weekly readiness report</li>
+          </ul>
+          <button class="button button--secondary full-width" id="previewProBtn" type="button">Preview Pro Outcome</button>
+          <form id="waitlistForm" class="waitlist-form">
+            <label for="emailInput">Email</label>
+            <div class="email-row">
+              <input id="emailInput" name="email" type="email" placeholder="you@example.com" autocomplete="email" />
+              <button class="button button--primary" type="submit">Start Pro</button>
+            </div>
+          </form>
+          <button class="button button--secondary full-width billing-button" id="checkProBtn" type="button">Check Pro Status</button>
+          <button class="button button--secondary full-width billing-button" id="manageBillingBtn" type="button">Manage Billing</button>
+          <p class="fine-print" id="waitlistStatus" aria-live="polite">Local demo only. No payment is connected yet.</p>
+        </section>
+
+        <section class="roadmap-panel" aria-labelledby="roadmapTitle">
+          <div class="pane-title">
+            <h2 id="roadmapTitle">Build Order</h2>
+            <span class="badge">Next</span>
+          </div>
+          <ol class="roadmap-list">
+            <li>Launch the website training loop</li>
+            <li>Validate paid Pro demand</li>
+            <li>Turn the website into an app</li>
+          </ol>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <strong>TicketReady</strong>
+        <span>Real-world service desk ticket practice for entry-level IT confidence.</span>
+      </div>
+      <nav aria-label="Business links">
+        <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="cancellation.html">Cancellation</a>
+      </nav>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
