@@ -345,6 +345,98 @@ select:focus-visible {
   transition: width 260ms ease;
 }
 
+.path-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: #ffffff;
+}
+
+.path-panel .eyebrow {
+  color: var(--teal-dark);
+}
+
+.path-summary {
+  margin-bottom: 12px;
+  color: #334441;
+  line-height: 1.48;
+}
+
+.path-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.path-day {
+  min-width: 0;
+  min-height: 154px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: #fbfdfc;
+}
+
+.path-day.is-current {
+  border-color: rgba(11, 124, 119, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(11, 124, 119, 0.22);
+}
+
+.path-day.is-complete {
+  border-color: rgba(47, 143, 91, 0.44);
+  background: #f0faf4;
+}
+
+.path-day.is-locked {
+  opacity: 0.58;
+}
+
+.path-day__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.path-day__top strong {
+  color: var(--teal-dark);
+}
+
+.path-day h4 {
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 0.91rem;
+  line-height: 1.2;
+}
+
+.path-day p {
+  margin-bottom: 8px;
+  color: #334441;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.path-day__target,
+.path-day small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.32;
+}
+
+.path-day__target {
+  margin-bottom: 6px;
+  font-weight: 900;
+}
+
 .panel-heading,
 .pane-title,
 .ticket-topline,
@@ -1061,6 +1153,10 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
+  .path-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .dashboard-card--plan {
     grid-column: 1 / -1;
   }
@@ -1084,6 +1180,10 @@ a {
 
   .dashboard-card--plan {
     grid-column: auto;
+  }
+
+  .path-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .queue-pane {
@@ -1159,7 +1259,8 @@ a {
   .ticket-list,
   .triage-form,
   .action-bank,
-  .skill-grid {
+  .skill-grid,
+  .path-grid {
     grid-template-columns: 1fr;
   }
 

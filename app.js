@@ -325,6 +325,39 @@ const skillNames = [
   "Windows",
 ];
 
+const trainingPath = [
+  { day: 1, title: "Ticket Triage", focus: "Read the request, find impact, choose category.", tickets: "2 guided tickets", evidence: "Write one clean issue summary." },
+  { day: 2, title: "Priority And SLA", focus: "Separate urgency from noise and set the right P-level.", tickets: "3 priority calls", evidence: "Explain one P1 vs P2 decision." },
+  { day: 3, title: "Identity And MFA", focus: "Protect accounts while helping users regain access.", tickets: "2 access tickets", evidence: "Document an MFA reset safely." },
+  { day: 4, title: "Password Resets", focus: "Verify identity, reset cleanly, and confirm login.", tickets: "3 access tickets", evidence: "Create a password reset script." },
+  { day: 5, title: "Phishing Intake", focus: "Stay calm, contain risk, and avoid blaming the user.", tickets: "2 security tickets", evidence: "Summarize a phishing containment case." },
+  { day: 6, title: "VPN Basics", focus: "Check scope, client, gateway, and error evidence.", tickets: "2 network tickets", evidence: "Build an escalation note." },
+  { day: 7, title: "Week 1 Review", focus: "Retry weak tickets and improve first-action choices.", tickets: "3 mixed tickets", evidence: "Save your strongest Week 1 proof entry." },
+  { day: 8, title: "Printer Queue", focus: "Troubleshoot without over-escalating.", tickets: "2 hardware tickets", evidence: "Document a verified fix." },
+  { day: 9, title: "SaaS Access", focus: "Confirm approval and least-privilege role assignment.", tickets: "2 service requests", evidence: "Write an access fulfillment note." },
+  { day: 10, title: "Remote Support", focus: "Get consent, observe the issue, and narrate next steps.", tickets: "2 incident tickets", evidence: "Practice a remote-session opening." },
+  { day: 11, title: "Escalation Quality", focus: "Send the next team enough facts to act.", tickets: "3 escalation drills", evidence: "Write one escalation packet." },
+  { day: 12, title: "Customer Tone", focus: "Be clear, calm, and specific under pressure.", tickets: "3 reply drills", evidence: "Rewrite one rushed response." },
+  { day: 13, title: "Windows Crashes", focus: "Collect logs, identify clues, and avoid guesswork.", tickets: "2 Windows tickets", evidence: "Summarize a crash investigation." },
+  { day: 14, title: "Week 2 Review", focus: "Raise your lowest skill and retry a missed case.", tickets: "3 mixed tickets", evidence: "Record your best interview answer." },
+  { day: 15, title: "Outage Signals", focus: "Spot many-user impact and communicate status.", tickets: "2 incident tickets", evidence: "Draft an outage update." },
+  { day: 16, title: "Onboarding Requests", focus: "Follow approvals, templates, and access timing.", tickets: "2 SaaS tickets", evidence: "Write a new-hire access note." },
+  { day: 17, title: "Security Follow-Up", focus: "Contain, educate, document, and keep the case open.", tickets: "2 security tickets", evidence: "Write a user coaching note." },
+  { day: 18, title: "Hardware Intake", focus: "Ask impact, check workarounds, and confirm test results.", tickets: "2 hardware tickets", evidence: "Build a device troubleshooting log." },
+  { day: 19, title: "Knowledge Base Use", focus: "Use approved fixes before improvising.", tickets: "3 KB drills", evidence: "Summarize a KB-backed fix." },
+  { day: 20, title: "SLA Pressure", focus: "Move fast while preserving safe process.", tickets: "3 speedrun tickets", evidence: "Explain how you protected quality." },
+  { day: 21, title: "Week 3 Review", focus: "Collect three proof entries and compare scores.", tickets: "3 mixed tickets", evidence: "Pick your best resume bullet." },
+  { day: 22, title: "Interview Stories", focus: "Turn tickets into STAR-style support stories.", tickets: "2 scored tickets", evidence: "Record one STAR answer." },
+  { day: 23, title: "Ticket Documentation", focus: "Write cause, action, result, and user confirmation.", tickets: "3 documentation drills", evidence: "Polish one final resolution note." },
+  { day: 24, title: "Difficult Users", focus: "Stay steady, set expectations, and avoid defensiveness.", tickets: "2 tone drills", evidence: "Rewrite a tense response." },
+  { day: 25, title: "Mixed Queue Shift", focus: "Handle access, network, security, and hardware in one shift.", tickets: "4 mixed tickets", evidence: "Save two evidence entries." },
+  { day: 26, title: "Escalation Interview", focus: "Explain when and why you escalated.", tickets: "2 escalation tickets", evidence: "Practice an escalation answer." },
+  { day: 27, title: "Readiness Gap Day", focus: "Target your weakest skill until it improves.", tickets: "3 weak-skill tickets", evidence: "Write a before/after reflection." },
+  { day: 28, title: "Mock First Shift", focus: "Run a realistic queue without guidance.", tickets: "5 speedrun tickets", evidence: "Save your top two cases." },
+  { day: 29, title: "Resume Evidence", focus: "Turn scored cases into honest resume proof.", tickets: "2 review tickets", evidence: "Draft three resume bullets." },
+  { day: 30, title: "Final Readiness Check", focus: "Prove consistent triage, action, and documentation.", tickets: "5 mixed tickets", evidence: "Export your final proof summary." },
+];
+
 const els = {
   ticketQueue: document.querySelector("#ticketQueue"),
   ticketId: document.querySelector("#ticketId"),
@@ -386,6 +419,9 @@ const els = {
   dashboardInterview: document.querySelector("#dashboardInterview"),
   rampFill: document.querySelector("#rampFill"),
   rampCopy: document.querySelector("#rampCopy"),
+  pathSummaryBadge: document.querySelector("#pathSummaryBadge"),
+  pathSummary: document.querySelector("#pathSummary"),
+  pathGrid: document.querySelector("#pathGrid"),
 };
 
 let activeTicketIndex = 0;
@@ -644,21 +680,60 @@ function getWeakestSkill() {
 function renderTodayPlan() {
   const ticket = tickets[activeTicketIndex];
   const weakestSkill = getWeakestSkill();
+  const pathDay = trainingPath[Math.min(trainingPath.length - 1, progress.solved)];
   const plan = proActive
     ? [
-        `Resolve ${ticket.id} and score 80+ on category, priority, and first action.`,
-        `Save one evidence entry focused on ${ticket.skills.join(", ")}.`,
-        `Practice one interview answer about ${weakestSkill} under SLA pressure.`,
+        `${pathDay.title}: ${pathDay.focus}`,
+        `${pathDay.tickets}. Score 80+ on ${ticket.id} if you can.`,
+        `${pathDay.evidence} Then rehearse one answer about ${weakestSkill}.`,
       ]
     : [
-        `Try ${ticket.id} as a free preview ticket.`,
-        "Subscribe to unlock saved evidence, interview drills, and the 30-day ramp.",
-        "Return after checkout and Pro will unlock on this dashboard.",
+        `${trainingPath[0].title}: ${trainingPath[0].focus}`,
+        `Try ${ticket.id} as the Day 1 preview ticket.`,
+        "Subscribe to unlock Days 2-30, saved evidence, and interview drills.",
       ];
 
   els.todayPlan.replaceChildren();
   plan.forEach((item) => {
     els.todayPlan.append(createTextElement("li", item));
+  });
+}
+
+function renderTrainingPath() {
+  const completedDays = Math.min(30, progress.solved);
+  const activeDay = Math.min(30, Math.max(1, progress.solved + 1));
+
+  els.pathSummaryBadge.textContent = proActive ? `${completedDays}/30 complete` : "Day 1 preview";
+  els.pathSummary.textContent = proActive
+    ? `You are on Day ${activeDay}. Complete each daily ticket set, save evidence, and keep raising readiness.`
+    : "Free users can preview Day 1. Pro unlocks the full 30-day ramp with daily tickets, evidence prompts, and interview practice.";
+  els.pathGrid.replaceChildren();
+
+  trainingPath.forEach((item) => {
+    const isUnlocked = proActive || item.day === 1;
+    const isComplete = proActive && item.day <= completedDays;
+    const isCurrent = item.day === activeDay && isUnlocked;
+    const card = document.createElement("article");
+    card.className = [
+      "path-day",
+      isUnlocked ? "is-unlocked" : "is-locked",
+      isComplete ? "is-complete" : "",
+      isCurrent ? "is-current" : "",
+    ].filter(Boolean).join(" ");
+
+    const top = document.createElement("div");
+    top.className = "path-day__top";
+    top.append(createTextElement("span", `Day ${item.day}`));
+    top.append(createTextElement("strong", isComplete ? "Done" : isUnlocked ? "Open" : "Locked"));
+
+    card.append(top);
+    card.append(createTextElement("h4", item.title));
+    card.append(createTextElement("p", item.focus));
+    card.append(createTextElement("span", item.tickets, "path-day__target"));
+    if (isUnlocked) {
+      card.append(createTextElement("small", item.evidence));
+    }
+    els.pathGrid.append(card);
   });
 }
 
@@ -715,6 +790,7 @@ function renderProDashboard() {
 
   renderTodayPlan();
   renderEvidenceVault();
+  renderTrainingPath();
 }
 
 function renderProState(email = localStorage.getItem("ticketReadyLastEmail") || "") {
