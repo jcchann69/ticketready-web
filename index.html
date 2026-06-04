@@ -25,6 +25,54 @@
     </header>
 
     <main class="app-shell">
+      <section class="pro-dashboard" id="proDashboard" aria-labelledby="proDashboardTitle">
+        <div class="dashboard-hero">
+          <div>
+            <p class="eyebrow">Subscriber Workspace</p>
+            <h2 id="proDashboardTitle">Pro Dashboard</h2>
+            <p id="dashboardWelcome">
+              Unlock Pro to turn practice tickets into a weekly job-readiness routine with evidence you can reuse.
+            </p>
+          </div>
+          <div class="dashboard-status">
+            <span class="badge" id="dashboardBadge">Free Preview</span>
+            <strong id="dashboardReadiness">0%</strong>
+            <span>readiness</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="dashboard-card dashboard-card--plan">
+            <div class="pane-title">
+              <h3>Today&apos;s Shift</h3>
+              <span class="badge" id="rampDayBadge">Day 1</span>
+            </div>
+            <ol id="todayPlan" class="today-plan"></ol>
+            <button class="button button--primary full-width" id="dashboardPrimaryBtn" type="button">Start Today&apos;s Shift</button>
+          </article>
+
+          <article class="dashboard-card">
+            <div class="pane-title">
+              <h3>Evidence Vault</h3>
+              <span class="badge" id="evidenceCountBadge">0 saved</span>
+            </div>
+            <div id="dashboardEvidenceList" class="evidence-list"></div>
+          </article>
+
+          <article class="dashboard-card">
+            <div class="pane-title">
+              <h3>Interview Drill</h3>
+              <span class="badge">Coach</span>
+            </div>
+            <p id="dashboardInterview">Complete a scored ticket to generate your first interview practice prompt.</p>
+            <div class="ramp-meter" aria-label="30-day ramp progress">
+              <span id="rampFill"></span>
+            </div>
+            <p class="fine-print" id="rampCopy">0 of 30 ramp days completed.</p>
+          </article>
+        </div>
+      </section>
+
       <section class="training-panel" aria-labelledby="trainingTitle">
         <div class="panel-heading">
           <div>

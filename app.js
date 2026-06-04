@@ -374,6 +374,18 @@ const els = {
   planSummaryCopy: document.querySelector("#planSummaryCopy"),
   subscriptionPanel: document.querySelector(".subscription-panel"),
   valueLab: document.querySelector(".value-lab"),
+  proDashboard: document.querySelector("#proDashboard"),
+  dashboardBadge: document.querySelector("#dashboardBadge"),
+  dashboardWelcome: document.querySelector("#dashboardWelcome"),
+  dashboardReadiness: document.querySelector("#dashboardReadiness"),
+  rampDayBadge: document.querySelector("#rampDayBadge"),
+  todayPlan: document.querySelector("#todayPlan"),
+  dashboardPrimaryBtn: document.querySelector("#dashboardPrimaryBtn"),
+  evidenceCountBadge: document.querySelector("#evidenceCountBadge"),
+  dashboardEvidenceList: document.querySelector("#dashboardEvidenceList"),
+  dashboardInterview: document.querySelector("#dashboardInterview"),
+  rampFill: document.querySelector("#rampFill"),
+  rampCopy: document.querySelector("#rampCopy"),
 };
 
 let activeTicketIndex = 0;
@@ -398,6 +410,7 @@ function loadProgress() {
       best: Number(saved.best || 0),
       scores: Array.isArray(saved.scores) ? saved.scores.slice(-20) : [],
       skills: { ...emptySkills, ...(saved.skills || {}) },
+      evidence: Array.isArray(saved.evidence) ? saved.evidence.slice(0, 20) : [],
     };
   } catch {
     return {
@@ -406,12 +419,20 @@ function loadProgress() {
       best: 0,
       scores: [],
       skills: emptySkills,
+      evidence: [],
     };
   }
 }
 
 function saveProgress() {
   localStorage.setItem("ticketReadyProgress", JSON.stringify(progress));
+}
+
+function calculateReadiness() {
+  const average = progress.scores.length
+    ? progress.scores.reduce((sum, score) => sum + score, 0) / progress.scores.length
+    : 0;
+  return Math.min(100, Math.round(average * 0.72 + Math.min(progress.solved, 20) * 1.4));
 }
 
 function createTextElement(tag, text, className) {
@@ -424,10 +445,7 @@ function createTextElement(tag, text, className) {
 }
 
 function renderStats() {
-  const average = progress.scores.length
-    ? progress.scores.reduce((sum, score) => sum + score, 0) / progress.scores.length
-    : 0;
-  const readiness = Math.min(100, Math.round(average * 0.72 + Math.min(progress.solved, 20) * 1.4));
+  const readiness = calculateReadiness();
 
   els.xpStat.textContent = progress.xp;
   els.solvedStat.textContent = progress.solved;
@@ -440,6 +458,7 @@ function renderStats() {
       : "Resolve tickets with clean triage, safe actions, and clear documentation to raise readiness.";
 
   renderSkills();
+  renderProDashboard();
 }
 
 function renderSkills() {
@@ -500,6 +519,7 @@ function loadTicket(index) {
   renderActions(ticket);
   renderCreatorClip(ticket);
   renderOutcomeLab(ticket);
+  renderProDashboard();
   updateSla();
 }
 
@@ -615,6 +635,88 @@ function renderOutcomeLab(ticket, result) {
   els.nextDrill.textContent = `Next drill: practice ${nextFocus} with two more ${ticket.skills[0].toLowerCase()} cases before moving to a harder queue.`;
 }
 
+function getWeakestSkill() {
+  return Object.entries(progress.skills)
+    .sort((first, second) => first[1] - second[1])
+    .find(([, value]) => value < 70)?.[0] || tickets[activeTicketIndex].skills[0];
+}
+
+function renderTodayPlan() {
+  const ticket = tickets[activeTicketIndex];
+  const weakestSkill = getWeakestSkill();
+  const plan = proActive
+    ? [
+        `Resolve ${ticket.id} and score 80+ on category, priority, and first action.`,
+        `Save one evidence entry focused on ${ticket.skills.join(", ")}.`,
+        `Practice one interview answer about ${weakestSkill} under SLA pressure.`,
+      ]
+    : [
+        `Try ${ticket.id} as a free preview ticket.`,
+        "Subscribe to unlock saved evidence, interview drills, and the 30-day ramp.",
+        "Return after checkout and Pro will unlock on this dashboard.",
+      ];
+
+  els.todayPlan.replaceChildren();
+  plan.forEach((item) => {
+    els.todayPlan.append(createTextElement("li", item));
+  });
+}
+
+function renderEvidenceVault() {
+  els.dashboardEvidenceList.replaceChildren();
+  const evidence = progress.evidence.slice(0, 3);
+  els.evidenceCountBadge.textContent = `${progress.evidence.length} saved`;
+
+  if (!proActive) {
+    const locked = document.createElement("div");
+    locked.className = "evidence-empty";
+    locked.textContent = "Pro saves your strongest scored tickets as resume/interview proof. Complete a ticket to preview the first entry.";
+    els.dashboardEvidenceList.append(locked);
+    return;
+  }
+
+  if (!evidence.length) {
+    const empty = document.createElement("div");
+    empty.className = "evidence-empty";
+    empty.textContent = "No evidence saved yet. Finish today's shift to create your first proof entry.";
+    els.dashboardEvidenceList.append(empty);
+    return;
+  }
+
+  evidence.forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "evidence-item";
+    item.append(createTextElement("strong", `${entry.ticketId} - ${entry.score}/100`));
+    item.append(createTextElement("span", entry.summary));
+    els.dashboardEvidenceList.append(item);
+  });
+}
+
+function renderProDashboard() {
+  const readiness = calculateReadiness();
+  const rampDay = Math.min(30, Math.max(1, progress.solved + 1));
+  const completedRampDays = Math.min(30, progress.solved);
+  const latestEvidence = progress.evidence[0];
+
+  els.proDashboard.classList.toggle("is-pro-active", proActive);
+  els.dashboardBadge.textContent = proActive ? "Pro Active" : "Free Preview";
+  els.dashboardBadge.classList.toggle("is-active", proActive);
+  els.dashboardWelcome.textContent = proActive
+    ? "Your paid workspace is ready. Finish today's shift, save proof, and rehearse one interview answer."
+    : "Unlock Pro to turn practice tickets into a weekly job-readiness routine with evidence you can reuse.";
+  els.dashboardReadiness.textContent = `${readiness}%`;
+  els.rampDayBadge.textContent = `Day ${rampDay}`;
+  els.rampFill.style.width = `${Math.round((completedRampDays / 30) * 100)}%`;
+  els.rampCopy.textContent = `${completedRampDays} of 30 ramp days completed.`;
+  els.dashboardInterview.textContent = latestEvidence
+    ? latestEvidence.interviewPrompt
+    : `Practice explaining why ${tickets[activeTicketIndex].title} is a ${tickets[activeTicketIndex].priority} and what you would do first.`;
+  els.dashboardPrimaryBtn.textContent = proActive ? "Start Today's Shift" : "Unlock Pro";
+
+  renderTodayPlan();
+  renderEvidenceVault();
+}
+
 function renderProState(email = localStorage.getItem("ticketReadyLastEmail") || "") {
   els.proStatusBadge.textContent = proActive ? "Pro Active" : "Free";
   els.proStatusBadge.classList.toggle("is-active", proActive);
@@ -627,6 +729,8 @@ function renderProState(email = localStorage.getItem("ticketReadyLastEmail") || 
   if (email && !els.emailInput.value) {
     els.emailInput.value = email;
   }
+
+  renderProDashboard();
 }
 
 function setProState(entitlement, email) {
@@ -733,6 +837,15 @@ function submitTicket() {
     const previous = progress.skills[skill] || 0;
     progress.skills[skill] = Math.min(100, previous + Math.max(4, result.score / 12));
   });
+  progress.evidence.unshift({
+    ticketId: ticket.id,
+    title: ticket.title,
+    score: result.score,
+    summary: `${ticket.title}: scored ${result.score}/100 while practicing ${ticket.skills.join(", ")}.`,
+    interviewPrompt: `Tell me about a ${ticket.category.toLowerCase()} ticket where you had to balance urgency and safe process. Use ${ticket.title} as your example.`,
+    createdAt: new Date().toISOString(),
+  });
+  progress.evidence = progress.evidence.slice(0, 20);
   saveProgress();
 
   els.scoreValue.textContent = result.score;
@@ -844,6 +957,7 @@ function showCheckoutReturnStatus() {
   if (checkout === "success") {
     els.waitlistStatus.textContent = "Checkout completed. Pro unlocks after the Stripe webhook confirms the subscription.";
     confirmCheckoutSession(sessionId);
+    els.proDashboard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   if (checkout === "cancelled") {
     els.waitlistStatus.textContent = "Checkout was cancelled. You can restart Pro whenever you are ready.";
@@ -1017,6 +1131,15 @@ function bindEvents() {
 
   els.previewProBtn.addEventListener("click", () => {
     document.querySelector(".value-lab").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  els.dashboardPrimaryBtn.addEventListener("click", () => {
+    if (proActive) {
+      document.querySelector(".training-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    document.querySelector(".subscription-panel").scrollIntoView({ behavior: "smooth", block: "center" });
+    els.emailInput.focus();
   });
 
   els.replyTone.addEventListener("click", (event) => {
