@@ -284,7 +284,8 @@ select:focus-visible {
 }
 
 .account-strip__status,
-.account-strip__actions {
+.account-strip__actions,
+.account-strip__verify {
   min-width: 0;
 }
 
@@ -311,6 +312,29 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
+}
+
+.account-strip__verify {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.account-strip:not(.is-code-sent) .account-strip__verify {
+  display: none;
+}
+
+.account-strip.is-signed-in .account-strip__verify {
+  grid-template-columns: auto;
+  justify-content: end;
+}
+
+.account-strip.is-signed-in #loginCodeInput,
+.account-strip.is-signed-in #verifyLoginCodeBtn,
+.account-strip.is-signed-in #sendLoginCodeBtn {
+  display: none;
 }
 
 .dashboard-grid {
@@ -1382,6 +1406,15 @@ a {
 
   .account-strip__actions {
     grid-template-columns: 1fr;
+  }
+
+  .account-strip__verify {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .account-strip.is-signed-in .account-strip__verify {
+    justify-content: stretch;
   }
 
   .weekly-report__actions {

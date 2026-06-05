@@ -13,6 +13,7 @@ TicketReady is a playable website prototype for a service desk training game. It
 - Pro Lab waitlist surface for subscription testing
 - Stripe-ready Node server for Pro subscription checkout, billing portal, webhook handling, and entitlement checks
 - SQLite database storage for accounts, subscriptions, progress, evidence, and weekly readiness reports
+- Passwordless email-code login with 30-day sessions for account/progress protection
 
 ## Subscription path
 
@@ -103,6 +104,18 @@ DATABASE_PATH=/var/data/ticketready.sqlite
 
 The app automatically imports older `data/subscriptions.json` and `data/profiles.json` records into SQLite when it first opens an empty database.
 
+## Account Login
+
+TicketReady uses passwordless email codes. Local development returns a test code in the browser so you can move quickly. Production should send codes by email with:
+
+```text
+SESSION_SECRET=replace_with_long_random_secret
+RESEND_API_KEY=re_...
+LOGIN_EMAIL_FROM=TicketReady <login@ticketready.net>
+```
+
+Until `RESEND_API_KEY` is configured in production, public users cannot receive login codes. That is intentional so a paid account cannot be opened by typing someone else's email.
+
 If a webhook is missed during local testing, use the `Check Pro Status` button. The backend also exposes `POST /api/sync-subscription`, which looks up the customer and subscription status directly from Stripe by email.
 
 ## Public Site Checklist
@@ -153,7 +166,7 @@ This gives the product repeatable TikTok, Shorts, and Reels content while also s
 
 ## Next build steps
 
-1. Harden accounts with passwordless login or magic-link verification.
+1. Configure production login email delivery.
 2. Add analytics for completion rate, upgrade clicks, and social campaign source.
 3. Expand the ticket library to 50 to 100 scenarios.
 4. Add generated certificates or resume evidence summaries.

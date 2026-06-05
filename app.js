@@ -1082,6 +1082,10 @@ const els = {
   accountEmailInput: document.querySelector("#accountEmailInput"),
   accountEmailLabel: document.querySelector("#accountEmailLabel"),
   accountSyncStatus: document.querySelector("#accountSyncStatus"),
+  loginCodeInput: document.querySelector("#loginCodeInput"),
+  sendLoginCodeBtn: document.querySelector("#sendLoginCodeBtn"),
+  verifyLoginCodeBtn: document.querySelector("#verifyLoginCodeBtn"),
+  signOutBtn: document.querySelector("#signOutBtn"),
   weeklyReportPanel: document.querySelector("#weeklyReportPanel"),
   weeklyReportBadge: document.querySelector("#weeklyReportBadge"),
   weeklyReportBody: document.querySelector("#weeklyReportBody"),
@@ -1099,6 +1103,7 @@ let lastEvidenceText = "";
 let paymentsReady = false;
 let proActive = localStorage.getItem("ticketReadyProActive") === "true";
 let accountEmail = localStorage.getItem("ticketReadyLastEmail") || "";
+let authToken = localStorage.getItem("ticketReadyAuthToken") || "";
 let weeklyReportText = "";
 
 const progress = loadProgress();
@@ -1137,6 +1142,35 @@ function loadProgress() {
 
 function saveProgress() {
   localStorage.setItem("ticketReadyProgress", JSON.stringify(progress));
+}
+
+function isSignedIn() {
+  return Boolean(authToken && accountEmail);
+}
+
+function authHeaders(extraHeaders = {}) {
+  return {
+    ...extraHeaders,
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+  };
+}
+
+function authFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: authHeaders(options.headers || {}),
+  });
+}
+
+function setAuthSession(payload) {
+  authToken = payload.authToken || authToken;
+  accountEmail = payload.email || accountEmail;
+  if (authToken) {
+    localStorage.setItem("ticketReadyAuthToken", authToken);
+  }
+  if (accountEmail) {
+    localStorage.setItem("ticketReadyLastEmail", accountEmail);
+  }
 }
 
 function mergeProgressRecords(localProgress, remoteProgress) {
@@ -1180,11 +1214,13 @@ function applyProgress(nextProgress) {
 
 function renderAccountSync(message) {
   const email = accountEmail || localStorage.getItem("ticketReadyLastEmail") || "";
+  const signedIn = Boolean(authToken && email);
+  els.accountForm.classList.toggle("is-signed-in", signedIn);
   els.accountEmailLabel.textContent = email || "Guest progress";
   if (email && !els.accountEmailInput.value) {
     els.accountEmailInput.value = email;
   }
-  els.accountSyncStatus.textContent = message || (email ? "Progress synced to account" : "Saved on this device");
+  els.accountSyncStatus.textContent = message || (signedIn ? "Signed in and syncing progress" : "Verify email to sync progress");
 }
 
 function calculateReadiness() {
@@ -1733,16 +1769,97 @@ function setProState(entitlement, email) {
   renderProState(email);
 }
 
+async function requestLoginCode(email, options = {}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    throw new Error("Enter a valid email to sign in.");
+  }
+
+  accountEmail = normalizedEmail;
+  localStorage.setItem("ticketReadyLastEmail", normalizedEmail);
+  els.accountEmailInput.value = normalizedEmail;
+  els.emailInput.value = normalizedEmail;
+  renderAccountSync("Sending login code...");
+
+  const response = await fetch("/api/auth/request-code", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: normalizedEmail }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Could not send login code.");
+  }
+
+  els.accountForm.classList.add("is-code-sent");
+  els.loginCodeInput.focus();
+  const devCopy = payload.devCode ? ` Test code: ${payload.devCode}` : "";
+  renderAccountSync(`Code sent. It expires in ${payload.expiresInMinutes} minutes.${devCopy}`);
+  if (!options.silent) {
+    els.waitlistStatus.textContent = `Check your email for the TicketReady code.${devCopy}`;
+  }
+  return payload;
+}
+
+async function verifyLoginCode() {
+  const email = els.accountEmailInput.value.trim() || accountEmail;
+  const code = els.loginCodeInput.value.trim();
+  renderAccountSync("Verifying code...");
+
+  try {
+    const response = await fetch("/api/auth/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not verify login code.");
+    }
+
+    setAuthSession(payload);
+    els.accountForm.classList.remove("is-code-sent");
+    els.loginCodeInput.value = "";
+    if (payload.progress) {
+      applyProgress(mergeProgressRecords(progress, payload.progress));
+    }
+    setProState(payload.entitlement, payload.email);
+    await syncProgressToAccount("Saving verified progress...");
+    renderAccountSync(payload.entitlement?.active ? "Pro account verified" : "Account verified");
+    els.waitlistStatus.textContent = `Signed in as ${payload.email}.`;
+  } catch (error) {
+    renderAccountSync(error.message);
+    els.waitlistStatus.textContent = error.message;
+  }
+}
+
+async function signOut() {
+  try {
+    await authFetch("/api/auth/logout", { method: "POST" });
+  } catch {
+    // Local sign-out still matters even if the network request fails.
+  }
+
+  authToken = "";
+  proActive = false;
+  localStorage.removeItem("ticketReadyAuthToken");
+  localStorage.setItem("ticketReadyProActive", "false");
+  renderProState(accountEmail);
+  renderQueue();
+  renderAccountSync("Signed out. Local practice progress remains on this device.");
+  els.waitlistStatus.textContent = "Signed out.";
+}
+
 async function syncProgressToAccount(statusText = "Saving progress to account...") {
   const email = accountEmail || localStorage.getItem("ticketReadyLastEmail") || "";
-  if (!email || !email.includes("@")) {
-    renderAccountSync("Saved on this device");
+  if (!email || !email.includes("@") || !authToken) {
+    renderAccountSync("Sign in to sync progress");
     return null;
   }
 
   renderAccountSync(statusText);
   try {
-    const response = await fetch("/api/progress", {
+    const response = await authFetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, progress }),
@@ -1767,6 +1884,10 @@ async function syncAccount(email, options = {}) {
   if (!normalizedEmail || !normalizedEmail.includes("@")) {
     throw new Error("Enter a valid email to sync.");
   }
+  if (!authToken || (accountEmail && normalizedEmail !== accountEmail.toLowerCase())) {
+    await requestLoginCode(normalizedEmail, options);
+    throw new Error("Enter the login code to finish signing in.");
+  }
 
   accountEmail = normalizedEmail;
   localStorage.setItem("ticketReadyLastEmail", normalizedEmail);
@@ -1777,7 +1898,7 @@ async function syncAccount(email, options = {}) {
     renderAccountSync("Checking account...");
   }
 
-  const response = await fetch("/api/accounts", {
+  const response = await authFetch("/api/accounts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: normalizedEmail }),
@@ -1790,7 +1911,8 @@ async function syncAccount(email, options = {}) {
   if (payload.progress) {
     applyProgress(mergeProgressRecords(progress, payload.progress));
   }
-  setProState(payload.entitlement, normalizedEmail);
+  const sessionEmail = payload.profile?.email || normalizedEmail;
+  setProState(payload.entitlement, sessionEmail);
   await syncProgressToAccount(options.silent ? "Syncing progress..." : "Saving merged progress...");
   renderAccountSync(payload.entitlement?.active ? "Pro account synced" : "Free account synced");
   return payload;
@@ -1800,8 +1922,12 @@ async function handleAccountSync(event) {
   event.preventDefault();
   const email = els.accountEmailInput.value.trim() || els.emailInput.value.trim();
   try {
-    await syncAccount(email);
-    els.waitlistStatus.textContent = `Training account synced for ${accountEmail}.`;
+    if (isSignedIn()) {
+      await syncAccount(email);
+      els.waitlistStatus.textContent = `Training account synced for ${accountEmail}.`;
+      return;
+    }
+    await requestLoginCode(email);
   } catch (error) {
     renderAccountSync(error.message);
     els.waitlistStatus.textContent = error.message;
@@ -2067,7 +2193,7 @@ async function confirmCheckoutSession(sessionId) {
 
   els.waitlistStatus.textContent = "Checkout completed. Confirming Pro access...";
   try {
-    const response = await fetch("/api/confirm-checkout-session", {
+    const response = await authFetch("/api/confirm-checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),
@@ -2104,13 +2230,16 @@ async function handleWaitlist(event) {
   }
   localStorage.setItem("ticketReadyWaitlist", JSON.stringify(saved));
   localStorage.setItem("ticketReadyLastEmail", email);
-  accountEmail = email;
   renderAccountSync("Preparing account...");
 
-  try {
-    await syncAccount(email, { silent: true });
-  } catch {
-    renderAccountSync("Saved on this device");
+  if (!isSignedIn() || email.toLowerCase() !== accountEmail.toLowerCase()) {
+    try {
+      await requestLoginCode(email);
+      els.waitlistStatus.textContent = "Verify your email code, then click Start Pro again.";
+    } catch (error) {
+      els.waitlistStatus.textContent = error.message;
+    }
+    return;
   }
 
   if (!paymentsReady) {
@@ -2120,7 +2249,7 @@ async function handleWaitlist(event) {
 
   els.waitlistStatus.textContent = "Opening secure Stripe Checkout...";
   try {
-    const response = await fetch("/api/create-checkout-session", {
+    const response = await authFetch("/api/create-checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -2146,11 +2275,17 @@ async function checkProStatus() {
   els.waitlistStatus.textContent = "Checking Pro status...";
 
   try {
-    let response = await fetch(`/api/entitlements?email=${encodeURIComponent(email)}`);
+    if (!isSignedIn() || email.toLowerCase() !== accountEmail.toLowerCase()) {
+      await requestLoginCode(email);
+      els.waitlistStatus.textContent = "Verify your email code, then check Pro status again.";
+      return;
+    }
+
+    let response = await authFetch("/api/entitlements");
     let entitlement = await response.json();
 
     if (!entitlement.active && paymentsReady) {
-      response = await fetch("/api/sync-subscription", {
+      response = await authFetch("/api/sync-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -2174,17 +2309,29 @@ async function checkProStatus() {
 
 async function checkStoredProStatus() {
   const email = localStorage.getItem("ticketReadyLastEmail");
-  if (!email) {
+  if (!email || !authToken) {
     renderProState(email || "");
     return;
   }
 
   try {
-    const account = await syncAccount(email, { silent: true });
+    const response = await authFetch("/api/auth/session");
+    const account = await response.json();
+    if (!response.ok) {
+      throw new Error(account.error || "Session expired.");
+    }
+    setAuthSession(account);
+    if (account.progress) {
+      applyProgress(mergeProgressRecords(progress, account.progress));
+    }
+    setProState(account.entitlement, account.email);
+    await syncProgressToAccount("Syncing saved progress...");
     if (account?.entitlement?.active) {
       els.waitlistStatus.textContent = "Pro is active on this device.";
     }
   } catch {
+    authToken = "";
+    localStorage.removeItem("ticketReadyAuthToken");
     renderProState(email);
   }
 }
@@ -2195,10 +2342,19 @@ async function manageBilling() {
     els.waitlistStatus.textContent = "Enter the subscriber email first, then manage billing.";
     return;
   }
+  if (!isSignedIn() || email.toLowerCase() !== accountEmail.toLowerCase()) {
+    try {
+      await requestLoginCode(email);
+      els.waitlistStatus.textContent = "Verify your email code, then manage billing again.";
+    } catch (error) {
+      els.waitlistStatus.textContent = error.message;
+    }
+    return;
+  }
 
   els.waitlistStatus.textContent = "Opening Stripe billing portal...";
   try {
-    const response = await fetch("/api/create-portal-session", {
+    const response = await authFetch("/api/create-portal-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -2221,6 +2377,14 @@ function bindEvents() {
   els.copyEvidenceBtn.addEventListener("click", copyEvidence);
   els.copyWeeklyReportBtn.addEventListener("click", copyWeeklyReport);
   els.accountForm.addEventListener("submit", handleAccountSync);
+  els.verifyLoginCodeBtn.addEventListener("click", verifyLoginCode);
+  els.signOutBtn.addEventListener("click", signOut);
+  els.loginCodeInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      verifyLoginCode();
+    }
+  });
   els.waitlistForm.addEventListener("submit", handleWaitlist);
   els.checkProBtn.addEventListener("click", checkProStatus);
   els.manageBillingBtn.addEventListener("click", manageBilling);

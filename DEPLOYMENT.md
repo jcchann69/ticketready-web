@@ -61,6 +61,9 @@ Set these in Render. Do not commit them to GitHub.
 ```text
 SITE_URL=https://www.ticketready.net
 DATABASE_PATH=/var/data/ticketready.sqlite
+SESSION_SECRET=long_random_secret
+RESEND_API_KEY=re_...
+LOGIN_EMAIL_FROM=TicketReady <login@ticketready.net>
 STRIPE_SECRET_KEY=sk_test_... first, sk_live_... later
 STRIPE_PUBLISHABLE_KEY=pk_test_... first, pk_live_... later
 STRIPE_PRICE_ID=price_...
@@ -68,6 +71,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 Start with Stripe test keys even on the deployed domain. Switch to live keys only after the deployed test checkout works.
+
+For local development, TicketReady can show a test login code on localhost. For production, configure `RESEND_API_KEY` and `LOGIN_EMAIL_FROM` before real users need to sign in.
 
 ## Domain Setup
 

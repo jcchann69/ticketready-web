@@ -5,6 +5,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import Stripe from "stripe";
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 let DatabaseSync = null;
@@ -31,6 +32,8 @@ const profileStorePath = path.join(dataDir, "profiles.json");
 const databasePath = process.env.DATABASE_PATH || path.join(dataDir, "ticketready.sqlite");
 const fallbackDatabasePath = `${databasePath}.json`;
 const envPath = path.join(__dirname, ".env");
+const loginCodeMinutes = 10;
+const sessionDays = 30;
 const progressSkillNames = [
   "Identity",
   "SLA",
@@ -152,7 +155,7 @@ function readJsonFileSync(filePath, fallback) {
 
 function getFallbackDatabaseStore() {
   if (fsSync.existsSync(fallbackDatabasePath)) {
-    return readJsonFileSync(fallbackDatabasePath, { customers: {}, emails: {}, profiles: {} });
+    return readJsonFileSync(fallbackDatabasePath, { customers: {}, emails: {}, profiles: {}, authCodes: {}, sessions: {} });
   }
 
   const subscriptionStore = readJsonFileSync(subscriptionStorePath, { customers: {}, emails: {} });
@@ -161,6 +164,8 @@ function getFallbackDatabaseStore() {
     customers: subscriptionStore.customers || {},
     emails: subscriptionStore.emails || {},
     profiles: profileStore.profiles || {},
+    authCodes: {},
+    sessions: {},
   };
 }
 
@@ -222,6 +227,22 @@ function getDatabase() {
         last_seen_at TEXT NOT NULL,
         progress_json TEXT NOT NULL,
         progress_updated_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS auth_codes (
+        email TEXT PRIMARY KEY,
+        code_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        token_hash TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
       );
     `);
     migrateJsonStoresToDatabase(database);
@@ -652,6 +673,261 @@ async function saveProgress(email, incomingProgress) {
   return profile;
 }
 
+function getSessionSecret() {
+  return process.env.SESSION_SECRET || getStripeSecretKey() || "ticketready-local-session-secret";
+}
+
+function hashSecret(value) {
+  return createHmac("sha256", getSessionSecret()).update(String(value || "")).digest("hex");
+}
+
+function secretsMatch(first, second) {
+  const firstBuffer = Buffer.from(String(first || ""), "hex");
+  const secondBuffer = Buffer.from(String(second || ""), "hex");
+  return firstBuffer.length === secondBuffer.length && timingSafeEqual(firstBuffer, secondBuffer);
+}
+
+function addMinutes(date, minutes) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function addDays(date, days) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function isFutureDate(value) {
+  return Date.parse(value || "") > Date.now();
+}
+
+function generateLoginCode() {
+  return String(randomInt(100000, 1000000));
+}
+
+function generateSessionToken() {
+  return randomBytes(32).toString("hex");
+}
+
+async function saveAuthCode(email, code) {
+  const normalizedEmail = normalizeEmail(email);
+  const record = {
+    email: normalizedEmail,
+    codeHash: hashSecret(code),
+    expiresAt: addMinutes(new Date(), loginCodeMinutes).toISOString(),
+    attempts: 0,
+    createdAt: new Date().toISOString(),
+  };
+  const db = getDatabase();
+
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    store.authCodes = { ...(store.authCodes || {}), [normalizedEmail]: record };
+    writeFallbackDatabaseStore(store);
+    return record;
+  }
+
+  db.prepare(`
+    INSERT OR REPLACE INTO auth_codes (email, code_hash, expires_at, attempts, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(record.email, record.codeHash, record.expiresAt, record.attempts, record.createdAt);
+  return record;
+}
+
+async function getAuthCode(email) {
+  const normalizedEmail = normalizeEmail(email);
+  const db = getDatabase();
+
+  if (!db) {
+    return (getFallbackDatabaseStore().authCodes || {})[normalizedEmail] || null;
+  }
+
+  const row = db.prepare("SELECT email, code_hash, expires_at, attempts, created_at FROM auth_codes WHERE email = ?").get(normalizedEmail);
+  return row
+    ? {
+        email: row.email,
+        codeHash: row.code_hash,
+        expiresAt: row.expires_at,
+        attempts: row.attempts,
+        createdAt: row.created_at,
+      }
+    : null;
+}
+
+async function incrementAuthCodeAttempts(email) {
+  const normalizedEmail = normalizeEmail(email);
+  const db = getDatabase();
+
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    const record = (store.authCodes || {})[normalizedEmail];
+    if (record) {
+      record.attempts = Number(record.attempts || 0) + 1;
+      store.authCodes[normalizedEmail] = record;
+      writeFallbackDatabaseStore(store);
+    }
+    return;
+  }
+
+  db.prepare("UPDATE auth_codes SET attempts = attempts + 1 WHERE email = ?").run(normalizedEmail);
+}
+
+async function deleteAuthCode(email) {
+  const normalizedEmail = normalizeEmail(email);
+  const db = getDatabase();
+
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    delete (store.authCodes || {})[normalizedEmail];
+    writeFallbackDatabaseStore(store);
+    return;
+  }
+
+  db.prepare("DELETE FROM auth_codes WHERE email = ?").run(normalizedEmail);
+}
+
+async function createSession(email) {
+  const normalizedEmail = normalizeEmail(email);
+  const token = generateSessionToken();
+  const record = {
+    token,
+    tokenHash: hashSecret(token),
+    email: normalizedEmail,
+    expiresAt: addDays(new Date(), sessionDays).toISOString(),
+    createdAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+  };
+  const db = getDatabase();
+
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    store.sessions = { ...(store.sessions || {}), [record.tokenHash]: { ...record, token: undefined } };
+    writeFallbackDatabaseStore(store);
+    return record;
+  }
+
+  db.prepare(`
+    INSERT OR REPLACE INTO sessions (token_hash, email, expires_at, created_at, last_seen_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(record.tokenHash, record.email, record.expiresAt, record.createdAt, record.lastSeenAt);
+  return record;
+}
+
+async function getSessionByToken(token) {
+  if (!token) {
+    return null;
+  }
+
+  const tokenHash = hashSecret(token);
+  const db = getDatabase();
+  let record = null;
+
+  if (!db) {
+    record = (getFallbackDatabaseStore().sessions || {})[tokenHash] || null;
+  } else {
+    const row = db.prepare("SELECT token_hash, email, expires_at, created_at, last_seen_at FROM sessions WHERE token_hash = ?").get(tokenHash);
+    record = row
+      ? {
+          tokenHash: row.token_hash,
+          email: row.email,
+          expiresAt: row.expires_at,
+          createdAt: row.created_at,
+          lastSeenAt: row.last_seen_at,
+        }
+      : null;
+  }
+
+  if (!record || !secretsMatch(record.tokenHash, tokenHash) || !isFutureDate(record.expiresAt)) {
+    return null;
+  }
+
+  await touchSession(tokenHash);
+  return record;
+}
+
+async function touchSession(tokenHash) {
+  const lastSeenAt = new Date().toISOString();
+  const db = getDatabase();
+
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    const record = (store.sessions || {})[tokenHash];
+    if (record) {
+      record.lastSeenAt = lastSeenAt;
+      store.sessions[tokenHash] = record;
+      writeFallbackDatabaseStore(store);
+    }
+    return;
+  }
+
+  db.prepare("UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?").run(lastSeenAt, tokenHash);
+}
+
+async function deleteSession(token) {
+  const tokenHash = hashSecret(token);
+  const db = getDatabase();
+
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    delete (store.sessions || {})[tokenHash];
+    writeFallbackDatabaseStore(store);
+    return;
+  }
+
+  db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
+}
+
+function getRequestToken(request) {
+  const header = request.headers.authorization || "";
+  const [, token] = header.match(/^Bearer\s+(.+)$/i) || [];
+  return token || String(request.body?.authToken || request.query?.authToken || "");
+}
+
+async function getRequestSession(request) {
+  return getSessionByToken(getRequestToken(request));
+}
+
+async function requireSession(request, response) {
+  const session = await getRequestSession(request);
+  if (!session) {
+    response.status(401).json({ error: "Sign in with your email code first." });
+    return null;
+  }
+  return session;
+}
+
+async function sendLoginCode(email, code, request) {
+  const apiKey = process.env.RESEND_API_KEY || "";
+  const from = process.env.LOGIN_EMAIL_FROM || "";
+  const allowDevCode = isLocalRequest(request) || process.env.AUTH_DEV_CODES === "true";
+
+  if (apiKey && from) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: "Your TicketReady login code",
+        text: `Your TicketReady login code is ${code}. It expires in ${loginCodeMinutes} minutes.`,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not send login code.");
+    }
+
+    return { delivery: "email" };
+  }
+
+  if (allowDevCode) {
+    return { delivery: "dev", devCode: code };
+  }
+
+  throw new Error("Email login is not configured yet.");
+}
+
 async function syncSubscriptionFromStripe(email) {
   const stripe = getStripe();
   if (!stripe) {
@@ -770,6 +1046,100 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 
 app.use(express.json());
 
+app.post("/api/auth/request-code", async (request, response) => {
+  const email = normalizeEmail(request.body.email);
+  if (!email || !email.includes("@")) {
+    response.status(400).json({ error: "A valid email is required." });
+    return;
+  }
+
+  try {
+    await saveProfile(email);
+    const code = generateLoginCode();
+    const delivery = await sendLoginCode(email, code, request);
+    await saveAuthCode(email, code);
+    response.json({
+      ok: true,
+      email,
+      delivery: delivery.delivery,
+      devCode: delivery.devCode,
+      expiresInMinutes: loginCodeMinutes,
+    });
+  } catch (error) {
+    response.status(503).json({ error: error.message });
+  }
+});
+
+app.post("/api/auth/verify-code", async (request, response) => {
+  const email = normalizeEmail(request.body.email);
+  const code = String(request.body.code || "").trim();
+  if (!email || !email.includes("@") || !/^\d{6}$/.test(code)) {
+    response.status(400).json({ error: "Enter the 6-digit code sent to your email." });
+    return;
+  }
+
+  const record = await getAuthCode(email);
+  if (!record || !isFutureDate(record.expiresAt)) {
+    response.status(400).json({ error: "That login code expired. Request a new code." });
+    return;
+  }
+
+  if (Number(record.attempts || 0) >= 5) {
+    await deleteAuthCode(email);
+    response.status(429).json({ error: "Too many code attempts. Request a new code." });
+    return;
+  }
+
+  const incomingHash = hashSecret(code);
+  if (!secretsMatch(record.codeHash, incomingHash)) {
+    await incrementAuthCodeAttempts(email);
+    response.status(400).json({ error: "That code was not correct." });
+    return;
+  }
+
+  await deleteAuthCode(email);
+  const session = await createSession(email);
+  const profile = await saveProfile(email);
+  const entitlement = await getEntitlementWithStripeFallback(email);
+  response.json({
+    ok: true,
+    email,
+    authToken: session.token,
+    expiresAt: session.expiresAt,
+    profile,
+    entitlement,
+    progress: profile.progress,
+    progressUpdatedAt: profile.progressUpdatedAt,
+  });
+});
+
+app.get("/api/auth/session", async (request, response) => {
+  const session = await requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
+  const profile = await saveProfile(session.email);
+  const entitlement = await getEntitlementWithStripeFallback(session.email);
+  response.json({
+    ok: true,
+    email: session.email,
+    expiresAt: session.expiresAt,
+    profile,
+    entitlement,
+    progress: profile.progress,
+    progressUpdatedAt: profile.progressUpdatedAt,
+  });
+});
+
+app.post("/api/auth/logout", async (request, response) => {
+  const token = getRequestToken(request);
+  if (token) {
+    await deleteSession(token);
+  }
+  response.json({ ok: true });
+});
+
 app.get("/api/config", (_request, response) => {
   const secretKey = getStripeSecretKey();
   const publishableKey = getStripePublishableKey();
@@ -878,65 +1248,60 @@ app.post("/api/local/create-stripe-price", async (request, response) => {
 });
 
 app.get("/api/entitlements", async (request, response) => {
-  const email = normalizeEmail(request.query.email);
-  if (!email) {
-    response.status(400).json({ error: "Email is required." });
+  const session = await requireSession(request, response);
+  if (!session) {
     return;
   }
-  response.json(await getEntitlementWithStripeFallback(email));
+  response.json(await getEntitlementWithStripeFallback(session.email));
 });
 
 app.post("/api/accounts", async (request, response) => {
-  const email = normalizeEmail(request.body.email);
-  if (!email || !email.includes("@")) {
-    response.status(400).json({ error: "A valid email is required." });
+  const session = await requireSession(request, response);
+  if (!session) {
     return;
   }
 
-  const profile = await saveProfile(email);
-  const entitlement = await getEntitlementWithStripeFallback(email);
+  const profile = await saveProfile(session.email);
+  const entitlement = await getEntitlementWithStripeFallback(session.email);
   response.json({ profile, entitlement, progress: profile.progress, progressUpdatedAt: profile.progressUpdatedAt });
 });
 
 app.get("/api/progress", async (request, response) => {
-  const email = normalizeEmail(request.query.email);
-  if (!email || !email.includes("@")) {
-    response.status(400).json({ error: "A valid email is required." });
+  const session = await requireSession(request, response);
+  if (!session) {
     return;
   }
 
-  const profile = await saveProfile(email);
+  const profile = await saveProfile(session.email);
   response.json({
-    email,
+    email: session.email,
     progress: profile.progress,
     progressUpdatedAt: profile.progressUpdatedAt,
   });
 });
 
 app.post("/api/progress", async (request, response) => {
-  const email = normalizeEmail(request.body.email);
-  if (!email || !email.includes("@")) {
-    response.status(400).json({ error: "A valid email is required." });
+  const session = await requireSession(request, response);
+  if (!session) {
     return;
   }
 
-  const profile = await saveProgress(email, request.body.progress || {});
+  const profile = await saveProgress(session.email, request.body.progress || {});
   response.json({
-    email,
+    email: session.email,
     progress: profile.progress,
     progressUpdatedAt: profile.progressUpdatedAt,
   });
 });
 
 app.get("/api/mobile/bootstrap", async (request, response) => {
-  const email = normalizeEmail(request.query.email);
-  if (!email || !email.includes("@")) {
-    response.status(400).json({ error: "A valid email is required." });
+  const session = await requireSession(request, response);
+  if (!session) {
     return;
   }
 
-  const profile = await saveProfile(email);
-  const entitlement = await getEntitlementWithStripeFallback(email);
+  const profile = await saveProfile(session.email);
+  const entitlement = await getEntitlementWithStripeFallback(session.email);
   response.json({
     profile,
     entitlement,
@@ -948,14 +1313,13 @@ app.get("/api/mobile/bootstrap", async (request, response) => {
 });
 
 app.post("/api/sync-subscription", async (request, response) => {
-  const email = normalizeEmail(request.body.email);
-  if (!email || !email.includes("@")) {
-    response.status(400).json({ error: "A valid email is required." });
+  const session = await requireSession(request, response);
+  if (!session) {
     return;
   }
 
   try {
-    const entitlement = await syncSubscriptionFromStripe(email);
+    const entitlement = await syncSubscriptionFromStripe(session.email);
     response.json(entitlement);
   } catch (error) {
     response.status(503).json({ error: error.message });
@@ -964,6 +1328,10 @@ app.post("/api/sync-subscription", async (request, response) => {
 
 app.post("/api/confirm-checkout-session", async (request, response) => {
   const stripe = getStripe();
+  const authSession = await requireSession(request, response);
+  if (!authSession) {
+    return;
+  }
   const sessionId = String(request.body.sessionId || "").trim();
 
   if (!stripe) {
@@ -977,13 +1345,18 @@ app.post("/api/confirm-checkout-session", async (request, response) => {
   }
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+    const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["subscription", "customer"],
     });
-    const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+    const customerId = typeof checkoutSession.customer === "string" ? checkoutSession.customer : checkoutSession.customer?.id;
     const subscription =
-      typeof session.subscription === "string" ? { id: session.subscription, status: "checkout_complete" } : session.subscription;
-    const email = session.customer_details?.email || session.customer_email || session.customer?.email || "";
+      typeof checkoutSession.subscription === "string" ? { id: checkoutSession.subscription, status: "checkout_complete" } : checkoutSession.subscription;
+    const email = checkoutSession.customer_details?.email || checkoutSession.customer_email || checkoutSession.customer?.email || "";
+
+    if (normalizeEmail(email) !== authSession.email) {
+      response.status(403).json({ error: "Checkout session email does not match your signed-in account." });
+      return;
+    }
 
     if (!customerId) {
       response.status(400).json({ error: "Checkout session does not have a customer yet." });
@@ -1011,6 +1384,11 @@ app.post("/api/confirm-checkout-session", async (request, response) => {
 });
 
 app.post("/api/create-checkout-session", async (request, response) => {
+  const session = await requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
   if (!paymentsReady()) {
     response.status(503).json({
       error: "Stripe is not configured yet. Add STRIPE_SECRET_KEY and STRIPE_PRICE_ID to .env.",
@@ -1020,11 +1398,7 @@ app.post("/api/create-checkout-session", async (request, response) => {
 
   const stripe = getStripe();
   const priceId = getStripePriceId();
-  const email = normalizeEmail(request.body.email);
-  if (!email || !email.includes("@")) {
-    response.status(400).json({ error: "A valid email is required." });
-    return;
-  }
+  const email = session.email;
 
   try {
     await saveProfile(email);
@@ -1062,8 +1436,12 @@ app.post("/api/create-portal-session", async (request, response) => {
     return;
   }
 
-  const email = normalizeEmail(request.body.email);
-  const entitlement = await getEntitlementWithStripeFallback(email);
+  const session = await requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
+  const entitlement = await getEntitlementWithStripeFallback(session.email);
   if (!entitlement.customerId) {
     response.status(404).json({ error: "No Stripe customer found for that email." });
     return;
