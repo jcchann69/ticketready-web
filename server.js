@@ -1,9 +1,11 @@
 import "dotenv/config";
 
 import express from "express";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import Stripe from "stripe";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,6 +16,7 @@ const siteUrl = process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || `http
 const dataDir = path.join(__dirname, "data");
 const subscriptionStorePath = path.join(dataDir, "subscriptions.json");
 const profileStorePath = path.join(dataDir, "profiles.json");
+const databasePath = process.env.DATABASE_PATH || path.join(dataDir, "ticketready.sqlite");
 const envPath = path.join(__dirname, ".env");
 const progressSkillNames = [
   "Identity",
@@ -32,6 +35,7 @@ const progressSkillNames = [
 
 let stripeClient = null;
 let stripeClientKey = "";
+let database = null;
 
 function paymentsReady() {
   const priceId = getStripePriceId();
@@ -107,6 +111,7 @@ async function writeEnvFile({ publishableKey, secretKey, priceId, webhookSecret 
   const nextValues = {
     PORT: String(port),
     SITE_URL: siteUrl,
+    DATABASE_PATH: databasePath,
     STRIPE_SECRET_KEY: secretKey,
     STRIPE_PUBLISHABLE_KEY: publishableKey || "pk_test_replace_me",
     STRIPE_PRICE_ID: priceId || "price_replace_me",
@@ -123,32 +128,258 @@ async function writeEnvFile({ publishableKey, secretKey, priceId, webhookSecret 
   stripeClientKey = "";
 }
 
-async function readStore() {
+function readJsonFileSync(filePath, fallback) {
   try {
-    const raw = await fs.readFile(subscriptionStorePath, "utf8");
-    return JSON.parse(raw);
+    return JSON.parse(fsSync.readFileSync(filePath, "utf8"));
   } catch {
-    return { customers: {}, emails: {} };
+    return fallback;
   }
+}
+
+function runDatabaseTransaction(callback) {
+  const db = getDatabase();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = callback(db);
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function getDatabase() {
+  if (database) {
+    return database;
+  }
+
+  fsSync.mkdirSync(path.dirname(databasePath), { recursive: true });
+  database = new DatabaseSync(databasePath);
+  database.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      customer_id TEXT PRIMARY KEY,
+      email TEXT NOT NULL DEFAULT '',
+      subscription_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'unknown',
+      source TEXT NOT NULL DEFAULT 'unknown',
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_emails (
+      email TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES subscriptions(customer_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      email TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      progress_json TEXT NOT NULL,
+      progress_updated_at TEXT
+    );
+  `);
+  migrateJsonStoresToDatabase(database);
+  return database;
+}
+
+function migrateJsonStoresToDatabase(db) {
+  const profileCount = db.prepare("SELECT COUNT(*) AS count FROM profiles").get().count;
+  const subscriptionCount = db.prepare("SELECT COUNT(*) AS count FROM subscriptions").get().count;
+
+  if (profileCount === 0 && fsSync.existsSync(profileStorePath)) {
+    const profileStore = readJsonFileSync(profileStorePath, { profiles: {} });
+    const insertProfile = db.prepare(`
+      INSERT OR REPLACE INTO profiles (email, created_at, last_seen_at, progress_json, progress_updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    Object.entries(profileStore.profiles || {}).forEach(([email, profile]) => {
+      const normalizedEmail = normalizeEmail(profile.email || email);
+      if (!normalizedEmail) {
+        return;
+      }
+      const now = new Date().toISOString();
+      insertProfile.run(
+        normalizedEmail,
+        profile.createdAt || now,
+        profile.lastSeenAt || now,
+        JSON.stringify(sanitizeProgress(profile.progress || {})),
+        profile.progressUpdatedAt || null
+      );
+    });
+  }
+
+  if (subscriptionCount === 0 && fsSync.existsSync(subscriptionStorePath)) {
+    const subscriptionStore = readJsonFileSync(subscriptionStorePath, { customers: {}, emails: {} });
+    const insertSubscription = db.prepare(`
+      INSERT OR REPLACE INTO subscriptions (customer_id, email, subscription_id, status, source, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const insertEmail = db.prepare(`
+      INSERT OR REPLACE INTO subscription_emails (email, customer_id)
+      VALUES (?, ?)
+    `);
+
+    Object.values(subscriptionStore.customers || {}).forEach((record) => {
+      if (!record.customerId) {
+        return;
+      }
+      insertSubscription.run(
+        record.customerId,
+        normalizeEmail(record.email),
+        record.subscriptionId || "",
+        record.status || "unknown",
+        record.source || "json_migration",
+        record.updatedAt || new Date().toISOString()
+      );
+      if (record.email) {
+        insertEmail.run(normalizeEmail(record.email), record.customerId);
+      }
+    });
+
+    Object.entries(subscriptionStore.emails || {}).forEach(([email, customerId]) => {
+      if (email && customerId) {
+        insertEmail.run(normalizeEmail(email), customerId);
+      }
+    });
+  }
+}
+
+function getStorageStatus() {
+  try {
+    getDatabase().prepare("SELECT 1 AS ok").get();
+    return {
+      driver: "sqlite",
+      ready: true,
+      persistentPathConfigured: Boolean(process.env.DATABASE_PATH),
+    };
+  } catch {
+    return {
+      driver: "sqlite",
+      ready: false,
+      persistentPathConfigured: Boolean(process.env.DATABASE_PATH),
+    };
+  }
+}
+
+async function readStore() {
+  const db = getDatabase();
+  const customers = {};
+  const emails = {};
+
+  db.prepare("SELECT customer_id, email, subscription_id, status, source, updated_at FROM subscriptions")
+    .all()
+    .forEach((row) => {
+      customers[row.customer_id] = {
+        customerId: row.customer_id,
+        email: row.email,
+        subscriptionId: row.subscription_id,
+        status: row.status,
+        source: row.source,
+        updatedAt: row.updated_at,
+      };
+    });
+
+  db.prepare("SELECT email, customer_id FROM subscription_emails")
+    .all()
+    .forEach((row) => {
+      emails[row.email] = row.customer_id;
+    });
+
+  return { customers, emails };
 }
 
 async function writeStore(store) {
-  await fs.mkdir(dataDir, { recursive: true });
-  await fs.writeFile(subscriptionStorePath, JSON.stringify(store, null, 2));
+  runDatabaseTransaction((db) => {
+    db.exec("DELETE FROM subscription_emails; DELETE FROM subscriptions;");
+    const insertSubscription = db.prepare(`
+      INSERT OR REPLACE INTO subscriptions (customer_id, email, subscription_id, status, source, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const insertEmail = db.prepare(`
+      INSERT OR REPLACE INTO subscription_emails (email, customer_id)
+      VALUES (?, ?)
+    `);
+
+    Object.values(store.customers || {}).forEach((record) => {
+      if (!record.customerId) {
+        return;
+      }
+      insertSubscription.run(
+        record.customerId,
+        normalizeEmail(record.email),
+        record.subscriptionId || "",
+        record.status || "unknown",
+        record.source || "unknown",
+        record.updatedAt || new Date().toISOString()
+      );
+      if (record.email) {
+        insertEmail.run(normalizeEmail(record.email), record.customerId);
+      }
+    });
+
+    Object.entries(store.emails || {}).forEach(([email, customerId]) => {
+      if (email && customerId) {
+        insertEmail.run(normalizeEmail(email), customerId);
+      }
+    });
+  });
 }
 
 async function readProfiles() {
-  try {
-    const raw = await fs.readFile(profileStorePath, "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return { profiles: {} };
-  }
+  const db = getDatabase();
+  const profiles = {};
+
+  db.prepare("SELECT email, created_at, last_seen_at, progress_json, progress_updated_at FROM profiles")
+    .all()
+    .forEach((row) => {
+      profiles[row.email] = {
+        email: row.email,
+        createdAt: row.created_at,
+        lastSeenAt: row.last_seen_at,
+        progress: sanitizeProgress(readJsonValue(row.progress_json, {})),
+        progressUpdatedAt: row.progress_updated_at,
+      };
+    });
+
+  return { profiles };
 }
 
 async function writeProfiles(store) {
-  await fs.mkdir(dataDir, { recursive: true });
-  await fs.writeFile(profileStorePath, JSON.stringify(store, null, 2));
+  runDatabaseTransaction((db) => {
+    db.exec("DELETE FROM profiles;");
+    const insertProfile = db.prepare(`
+      INSERT OR REPLACE INTO profiles (email, created_at, last_seen_at, progress_json, progress_updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    Object.entries(store.profiles || {}).forEach(([email, profile]) => {
+      const normalizedEmail = normalizeEmail(profile.email || email);
+      if (!normalizedEmail) {
+        return;
+      }
+      const now = new Date().toISOString();
+      insertProfile.run(
+        normalizedEmail,
+        profile.createdAt || now,
+        profile.lastSeenAt || now,
+        JSON.stringify(sanitizeProgress(profile.progress || {})),
+        profile.progressUpdatedAt || null
+      );
+    });
+  });
+}
+
+function readJsonValue(value, fallback) {
+  try {
+    return JSON.parse(value || "");
+  } catch {
+    return fallback;
+  }
 }
 
 function normalizeEmail(email) {
@@ -465,6 +696,7 @@ app.get("/api/health", (_request, response) => {
     ok: true,
     service: "ticketready-web",
     paymentsReady: paymentsReady(),
+    storage: getStorageStatus(),
     time: new Date().toISOString(),
   });
 });

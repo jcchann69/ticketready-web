@@ -12,6 +12,7 @@ TicketReady is a playable website prototype for a service desk training game. It
 - Creator Clip panel for short-form video hooks
 - Pro Lab waitlist surface for subscription testing
 - Stripe-ready Node server for Pro subscription checkout, billing portal, webhook handling, and entitlement checks
+- SQLite database storage for accounts, subscriptions, progress, evidence, and weekly readiness reports
 
 ## Subscription path
 
@@ -88,7 +89,19 @@ stripe listen --forward-to localhost:8788/api/stripe/webhook
 
 Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`, then restart the server.
 
-The local demo stores subscription status in `data/subscriptions.json` and lightweight account profiles in `data/profiles.json`. A real launch should move this to a database tied to user accounts.
+TicketReady now stores subscription status, lightweight account profiles, synced progress, and evidence in a SQLite database. Locally, the default path is:
+
+```text
+data/ticketready.sqlite
+```
+
+On Render, keep the database on a persistent disk with:
+
+```text
+DATABASE_PATH=/var/data/ticketready.sqlite
+```
+
+The app automatically imports older `data/subscriptions.json` and `data/profiles.json` records into SQLite when it first opens an empty database.
 
 If a webhook is missed during local testing, use the `Check Pro Status` button. The backend also exposes `POST /api/sync-subscription`, which looks up the customer and subscription status directly from Stripe by email.
 
@@ -140,8 +153,8 @@ This gives the product repeatable TikTok, Shorts, and Reels content while also s
 
 ## Next build steps
 
-1. Add backend accounts and persistent progress.
-2. Add payments for Pro Lab.
+1. Harden accounts with passwordless login or magic-link verification.
+2. Add analytics for completion rate, upgrade clicks, and social campaign source.
 3. Expand the ticket library to 50 to 100 scenarios.
 4. Add generated certificates or resume evidence summaries.
-5. Add analytics for completion rate, upgrade clicks, and social campaign source.
+5. Add a live-mode payment launch checklist.

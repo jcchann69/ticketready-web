@@ -44,12 +44,23 @@ Health check path:
 /api/health
 ```
 
+Persistent disk:
+
+```text
+Name: ticketready-data
+Mount path: /var/data
+Size: 1 GB
+```
+
+The Blueprint includes this disk. TicketReady writes its SQLite database to `/var/data/ticketready.sqlite` so accounts, subscriptions, progress, evidence, and weekly reports survive redeploys.
+
 ## Environment Variables
 
 Set these in Render. Do not commit them to GitHub.
 
 ```text
 SITE_URL=https://www.ticketready.net
+DATABASE_PATH=/var/data/ticketready.sqlite
 STRIPE_SECRET_KEY=sk_test_... first, sk_live_... later
 STRIPE_PUBLISHABLE_KEY=pk_test_... first, pk_live_... later
 STRIPE_PRICE_ID=price_...
@@ -103,6 +114,7 @@ https://www.ticketready.net/api/config
 Expected:
 
 - `/api/health` returns `ok: true`
+- `/api/health` returns `storage.ready: true`
 - `/api/config` returns `paymentsReady: true`
 - The footer policy pages load
 - Test checkout opens Stripe Checkout
