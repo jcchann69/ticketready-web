@@ -894,38 +894,109 @@ async function requireSession(request, response) {
   return session;
 }
 
+function getLoginEmailSubject() {
+  return "Your TicketReady login code";
+}
+
+function getLoginEmailText(code) {
+  return `Your TicketReady login code is ${code}. It expires in ${loginCodeMinutes} minutes.`;
+}
+
+function getLoginEmailHtml(code) {
+  return `<p>Your TicketReady login code is <strong>${code}</strong>.</p><p>It expires in ${loginCodeMinutes} minutes.</p>`;
+}
+
+function parseSenderAddress(value) {
+  const trimmed = String(value || "").trim();
+  const match = trimmed.match(/^(.*?)\s*<([^>]+)>$/);
+
+  if (match) {
+    const name = match[1].replace(/^"|"$/g, "").trim();
+    return {
+      email: match[2].trim(),
+      ...(name ? { name } : {}),
+    };
+  }
+
+  return { email: trimmed };
+}
+
+async function sendResendLoginCode(apiKey, from, email, code) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: getLoginEmailSubject(),
+      text: getLoginEmailText(code),
+      html: getLoginEmailHtml(code),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not send login code with Resend.");
+  }
+
+  return { delivery: "email", provider: "resend" };
+}
+
+async function sendSendGridLoginCode(apiKey, from, email, code) {
+  const sender = parseSenderAddress(from);
+  if (!sender.email) {
+    throw new Error("LOGIN_EMAIL_FROM is missing.");
+  }
+
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [
+        {
+          to: [{ email }],
+        },
+      ],
+      from: sender,
+      subject: getLoginEmailSubject(),
+      content: [
+        { type: "text/plain", value: getLoginEmailText(code) },
+        { type: "text/html", value: getLoginEmailHtml(code) },
+      ],
+    }),
+  });
+
+  if (response.status !== 202) {
+    throw new Error("Could not send login code with SendGrid.");
+  }
+
+  return { delivery: "email", provider: "sendgrid" };
+}
+
 async function sendLoginCode(email, code, request) {
-  const apiKey = process.env.RESEND_API_KEY || "";
+  const resendApiKey = process.env.RESEND_API_KEY || "";
+  const sendGridApiKey = process.env.SENDGRID_API_KEY || "";
   const from = process.env.LOGIN_EMAIL_FROM || "";
   const allowDevCode = isLocalRequest(request) || process.env.AUTH_DEV_CODES === "true";
 
-  if (apiKey && from) {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [email],
-        subject: "Your TicketReady login code",
-        text: `Your TicketReady login code is ${code}. It expires in ${loginCodeMinutes} minutes.`,
-      }),
-    });
+  if (resendApiKey && from) {
+    return sendResendLoginCode(resendApiKey, from, email, code);
+  }
 
-    if (!response.ok) {
-      throw new Error("Could not send login code.");
-    }
-
-    return { delivery: "email" };
+  if (sendGridApiKey && from) {
+    return sendSendGridLoginCode(sendGridApiKey, from, email, code);
   }
 
   if (allowDevCode) {
     return { delivery: "dev", devCode: code };
   }
 
-  throw new Error("Email login is not configured yet.");
+  throw new Error("Email login is not configured yet. Add RESEND_API_KEY or SENDGRID_API_KEY in Render.");
 }
 
 async function syncSubscriptionFromStripe(email) {

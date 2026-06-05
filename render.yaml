@@ -22,8 +22,10 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
       - key: LOGIN_EMAIL_FROM
-        value: TicketReady <login@ticketready.net>
+        value: "TicketReady <login@ticketready.net>"
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_PUBLISHABLE_KEY

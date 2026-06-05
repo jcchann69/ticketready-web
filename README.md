@@ -111,10 +111,11 @@ TicketReady uses passwordless email codes. Local development returns a test code
 ```text
 SESSION_SECRET=replace_with_long_random_secret
 RESEND_API_KEY=re_...
+SENDGRID_API_KEY=SG_...
 LOGIN_EMAIL_FROM=TicketReady <login@ticketready.net>
 ```
 
-Until `RESEND_API_KEY` is configured in production, public users cannot receive login codes. That is intentional so a paid account cannot be opened by typing someone else's email.
+Configure either `RESEND_API_KEY` or `SENDGRID_API_KEY` in production. Wix DNS cannot publish the subdomain MX record Resend asks for, so SendGrid with automated security is the easier Wix-compatible path because it uses CNAME records. Until one sender is configured, public users cannot receive login codes. That is intentional so a paid account cannot be opened by typing someone else's email.
 
 If a webhook is missed during local testing, use the `Check Pro Status` button. The backend also exposes `POST /api/sync-subscription`, which looks up the customer and subscription status directly from Stripe by email.
 
