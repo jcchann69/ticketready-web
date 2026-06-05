@@ -5,8 +5,20 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import Stripe from "stripe";
-import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
+
+let DatabaseSync = null;
+let sqliteLoadError = "";
+
+try {
+  if (process.env.TICKETREADY_DISABLE_SQLITE === "true") {
+    sqliteLoadError = "SQLite disabled by TICKETREADY_DISABLE_SQLITE.";
+  } else {
+    ({ DatabaseSync } = await import("node:sqlite"));
+  }
+} catch (error) {
+  sqliteLoadError = error.message;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +29,7 @@ const dataDir = path.join(__dirname, "data");
 const subscriptionStorePath = path.join(dataDir, "subscriptions.json");
 const profileStorePath = path.join(dataDir, "profiles.json");
 const databasePath = process.env.DATABASE_PATH || path.join(dataDir, "ticketready.sqlite");
+const fallbackDatabasePath = `${databasePath}.json`;
 const envPath = path.join(__dirname, ".env");
 const progressSkillNames = [
   "Identity",
@@ -36,6 +49,7 @@ const progressSkillNames = [
 let stripeClient = null;
 let stripeClientKey = "";
 let database = null;
+let databaseOpenError = "";
 
 function paymentsReady() {
   const priceId = getStripePriceId();
@@ -136,8 +150,30 @@ function readJsonFileSync(filePath, fallback) {
   }
 }
 
+function getFallbackDatabaseStore() {
+  if (fsSync.existsSync(fallbackDatabasePath)) {
+    return readJsonFileSync(fallbackDatabasePath, { customers: {}, emails: {}, profiles: {} });
+  }
+
+  const subscriptionStore = readJsonFileSync(subscriptionStorePath, { customers: {}, emails: {} });
+  const profileStore = readJsonFileSync(profileStorePath, { profiles: {} });
+  return {
+    customers: subscriptionStore.customers || {},
+    emails: subscriptionStore.emails || {},
+    profiles: profileStore.profiles || {},
+  };
+}
+
+function writeFallbackDatabaseStore(store) {
+  fsSync.mkdirSync(path.dirname(fallbackDatabasePath), { recursive: true });
+  fsSync.writeFileSync(fallbackDatabasePath, JSON.stringify(store, null, 2));
+}
+
 function runDatabaseTransaction(callback) {
   const db = getDatabase();
+  if (!db) {
+    throw new Error("SQLite driver is not available.");
+  }
   db.exec("BEGIN IMMEDIATE");
   try {
     const result = callback(db);
@@ -150,41 +186,51 @@ function runDatabaseTransaction(callback) {
 }
 
 function getDatabase() {
+  if (!DatabaseSync) {
+    return null;
+  }
+
   if (database) {
     return database;
   }
 
-  fsSync.mkdirSync(path.dirname(databasePath), { recursive: true });
-  database = new DatabaseSync(databasePath);
-  database.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
+  try {
+    fsSync.mkdirSync(path.dirname(databasePath), { recursive: true });
+    database = new DatabaseSync(databasePath);
+    database.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
 
-    CREATE TABLE IF NOT EXISTS subscriptions (
-      customer_id TEXT PRIMARY KEY,
-      email TEXT NOT NULL DEFAULT '',
-      subscription_id TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'unknown',
-      source TEXT NOT NULL DEFAULT 'unknown',
-      updated_at TEXT NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        customer_id TEXT PRIMARY KEY,
+        email TEXT NOT NULL DEFAULT '',
+        subscription_id TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'unknown',
+        source TEXT NOT NULL DEFAULT 'unknown',
+        updated_at TEXT NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS subscription_emails (
-      email TEXT PRIMARY KEY,
-      customer_id TEXT NOT NULL,
-      FOREIGN KEY (customer_id) REFERENCES subscriptions(customer_id) ON DELETE CASCADE
-    );
+      CREATE TABLE IF NOT EXISTS subscription_emails (
+        email TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES subscriptions(customer_id) ON DELETE CASCADE
+      );
 
-    CREATE TABLE IF NOT EXISTS profiles (
-      email TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL,
-      last_seen_at TEXT NOT NULL,
-      progress_json TEXT NOT NULL,
-      progress_updated_at TEXT
-    );
-  `);
-  migrateJsonStoresToDatabase(database);
-  return database;
+      CREATE TABLE IF NOT EXISTS profiles (
+        email TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        progress_json TEXT NOT NULL,
+        progress_updated_at TEXT
+      );
+    `);
+    migrateJsonStoresToDatabase(database);
+    return database;
+  } catch (error) {
+    database = null;
+    databaseOpenError = error.message;
+    return null;
+  }
 }
 
 function migrateJsonStoresToDatabase(db) {
@@ -251,7 +297,18 @@ function migrateJsonStoresToDatabase(db) {
 
 function getStorageStatus() {
   try {
-    getDatabase().prepare("SELECT 1 AS ok").get();
+    const db = getDatabase();
+    if (!db) {
+      getFallbackDatabaseStore();
+      return {
+        driver: "json-file",
+        ready: true,
+        persistentPathConfigured: Boolean(process.env.DATABASE_PATH),
+        fallbackReason: sqliteLoadError || databaseOpenError || "SQLite driver is not available in this runtime.",
+      };
+    }
+
+    db.prepare("SELECT 1 AS ok").get();
     return {
       driver: "sqlite",
       ready: true,
@@ -268,6 +325,14 @@ function getStorageStatus() {
 
 async function readStore() {
   const db = getDatabase();
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    return {
+      customers: store.customers || {},
+      emails: store.emails || {},
+    };
+  }
+
   const customers = {};
   const emails = {};
 
@@ -294,6 +359,16 @@ async function readStore() {
 }
 
 async function writeStore(store) {
+  if (!getDatabase()) {
+    const fallbackStore = getFallbackDatabaseStore();
+    writeFallbackDatabaseStore({
+      ...fallbackStore,
+      customers: store.customers || {},
+      emails: store.emails || {},
+    });
+    return;
+  }
+
   runDatabaseTransaction((db) => {
     db.exec("DELETE FROM subscription_emails; DELETE FROM subscriptions;");
     const insertSubscription = db.prepare(`
@@ -332,6 +407,13 @@ async function writeStore(store) {
 
 async function readProfiles() {
   const db = getDatabase();
+  if (!db) {
+    const store = getFallbackDatabaseStore();
+    return {
+      profiles: store.profiles || {},
+    };
+  }
+
   const profiles = {};
 
   db.prepare("SELECT email, created_at, last_seen_at, progress_json, progress_updated_at FROM profiles")
@@ -350,6 +432,15 @@ async function readProfiles() {
 }
 
 async function writeProfiles(store) {
+  if (!getDatabase()) {
+    const fallbackStore = getFallbackDatabaseStore();
+    writeFallbackDatabaseStore({
+      ...fallbackStore,
+      profiles: store.profiles || {},
+    });
+    return;
+  }
+
   runDatabaseTransaction((db) => {
     db.exec("DELETE FROM profiles;");
     const insertProfile = db.prepare(`
