@@ -9,6 +9,7 @@ TicketReady is a playable website prototype for a service desk training game. It
 - Scoring for category, priority, response tone, action choices, and dangerous shortcuts
 - Local progress tracking with XP, solved tickets, best score, skill growth, and readiness
 - Pro-style Job Evidence Lab with resume proof, interview prompts, and next-drill recommendations
+- Job-ready checklist that turns scores, evidence, skill coverage, and consistency into visible learner milestones
 - Creator Clip panel for short-form video hooks
 - Pro Lab waitlist surface for subscription testing
 - Stripe-ready Node server for Pro subscription checkout, billing portal, webhook handling, and entitlement checks

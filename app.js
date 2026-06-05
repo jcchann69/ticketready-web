@@ -1075,6 +1075,9 @@ const els = {
   dashboardInterview: document.querySelector("#dashboardInterview"),
   rampFill: document.querySelector("#rampFill"),
   rampCopy: document.querySelector("#rampCopy"),
+  readinessChecklistBadge: document.querySelector("#readinessChecklistBadge"),
+  readinessChecklist: document.querySelector("#readinessChecklist"),
+  readinessChecklistCopy: document.querySelector("#readinessChecklistCopy"),
   pathSummaryBadge: document.querySelector("#pathSummaryBadge"),
   pathSummary: document.querySelector("#pathSummary"),
   pathGrid: document.querySelector("#pathGrid"),
@@ -1228,6 +1231,65 @@ function calculateReadiness() {
     ? progress.scores.reduce((sum, score) => sum + score, 0) / progress.scores.length
     : 0;
   return Math.min(100, Math.round(average * 0.72 + Math.min(progress.solved, 20) * 1.4));
+}
+
+function getAverageScore(limit = progress.scores.length) {
+  const scores = progress.scores.slice(-limit);
+  if (!scores.length) {
+    return 0;
+  }
+
+  return Math.round(scores.reduce((sum, score) => sum + Number(score || 0), 0) / scores.length);
+}
+
+function getPracticedSkillCount() {
+  return Object.values(progress.skills).filter((value) => Number(value || 0) > 0).length;
+}
+
+function getReadinessMilestones() {
+  const skillCoverage = getPracticedSkillCount();
+  const recentScores = progress.scores.slice(-5);
+  const recentAverage = getAverageScore(5);
+  const strongEvidence = progress.evidence.filter((entry) => Number(entry.score || 0) >= 80).length;
+
+  return [
+    {
+      label: "Complete 3 tickets",
+      detail: "Build baseline triage reps before harder cases.",
+      value: `${Math.min(progress.solved, 3)}/3`,
+      complete: progress.solved >= 3,
+    },
+    {
+      label: "Score 80+ once",
+      detail: "Show one job-ready resolution path.",
+      value: progress.best ? `${progress.best}/100` : "0/100",
+      complete: progress.best >= 80,
+    },
+    {
+      label: "Save 3 evidence stories",
+      detail: "Create proof you can reuse in interviews.",
+      value: `${Math.min(progress.evidence.length, 3)}/3`,
+      complete: progress.evidence.length >= 3,
+    },
+    {
+      label: "Practice 4 skill areas",
+      detail: "Avoid looking strong in only one ticket type.",
+      value: `${Math.min(skillCoverage, 4)}/4`,
+      complete: skillCoverage >= 4,
+    },
+    {
+      label: "Average 75+ recently",
+      detail: "Prove consistency across your last 5 attempts.",
+      value: recentScores.length >= 5 ? `${recentAverage}/100` : `${recentScores.length}/5 reps`,
+      complete: recentScores.length >= 5 && recentAverage >= 75,
+    },
+    {
+      label: "Prepare an interview story",
+      detail: "Use a strong case to explain impact, action, and documentation.",
+      value: `${Math.min(strongEvidence, 1)}/1`,
+      complete: strongEvidence >= 1,
+    },
+  ];
 }
 
 function createTextElement(tag, text, className) {
@@ -1453,6 +1515,31 @@ function renderCreatorClip(ticket) {
   });
 }
 
+function getSelectedActionLabels(actionIds) {
+  return actionIds.map((actionId) => actionCatalog[actionId]?.label).filter(Boolean);
+}
+
+function buildEvidenceSummary(ticket, result) {
+  const actionSummary = getSelectedActionLabels(result.selected).join(", ") || "classified the ticket and planned next steps";
+  return `Handled ${ticket.id} ${ticket.category.toLowerCase()} case for ${ticket.company}. Impact: ${ticket.signals.join(", ")}. Actions: ${actionSummary}. Score: ${result.score}/100. Skills: ${ticket.skills.join(", ")}.`;
+}
+
+function buildInterviewPrompt(ticket) {
+  return `Tell me about ${ticket.title}. Explain the business impact, why you chose ${ticket.priority}, your first safe action, and how you documented the outcome.`;
+}
+
+function buildEvidenceStory(ticket, result) {
+  const actionSummary = getSelectedActionLabels(result.selected).map((label) => label.toLowerCase()).join(", ") || "no action path selected";
+  return [
+    `Resolved ${ticket.id}: ${ticket.title}`,
+    `Score: ${result.score}/100`,
+    `Business impact: ${ticket.signals.join(", ")}`,
+    `Action path: ${actionSummary}.`,
+    `Skills practiced: ${ticket.skills.join(", ")}.`,
+    `Outcome: ${ticket.outcome}`,
+  ].join("\n");
+}
+
 function renderOutcomeLab(ticket, result) {
   if (!result) {
     lastEvidenceText = `Practice case ${ticket.id}: ${ticket.title}. Focus areas: ${ticket.skills.join(", ")}.`;
@@ -1463,7 +1550,7 @@ function renderOutcomeLab(ticket, result) {
     return;
   }
 
-  const actionLabels = result.selected.map((actionId) => actionCatalog[actionId].label.toLowerCase());
+  const actionLabels = getSelectedActionLabels(result.selected).map((label) => label.toLowerCase());
   const selectedSummary = actionLabels.length ? actionLabels.join(", ") : "no action path selected";
   const weakPriority = result.notes.some((note) => note.startsWith("Priority should"));
   const weakCategory = result.notes.some((note) => note.startsWith("Category should"));
@@ -1476,17 +1563,10 @@ function renderOutcomeLab(ticket, result) {
         ? "safe resolution sequencing"
         : `${ticket.skills[0].toLowerCase()} speed and confidence`;
 
-  lastEvidenceText = [
-    `Resolved ${ticket.id}: ${ticket.title}`,
-    `Score: ${result.score}/100`,
-    `Business context: ${ticket.customerNote}`,
-    `Action path: ${selectedSummary}.`,
-    `Skills practiced: ${ticket.skills.join(", ")}.`,
-    `Outcome: ${ticket.outcome}`,
-  ].join("\n");
+  lastEvidenceText = buildEvidenceStory(ticket, result);
 
-  els.evidenceLog.textContent = `Resolved ${ticket.title} with a ${result.score}/100 score. Evidence saved around ${ticket.skills.join(", ")} using: ${selectedSummary}.`;
-  els.interviewPrompt.textContent = `Interview drill: walk through this ${ticket.category.toLowerCase()} case. Explain the business impact, why it was ${ticket.priority}, your first action, and how you documented the outcome.`;
+  els.evidenceLog.textContent = buildEvidenceSummary(ticket, result);
+  els.interviewPrompt.textContent = `Interview drill: ${buildInterviewPrompt(ticket)}`;
   els.nextDrill.textContent = `Next drill: practice ${nextFocus} with two more ${ticket.skills[0].toLowerCase()} cases before moving to a harder queue.`;
 }
 
@@ -1501,16 +1581,18 @@ function renderTodayPlan() {
   const ticket = tickets[recommendedTicketIndex];
   const weakestSkill = getWeakestSkill();
   const pathDay = trainingPath[Math.min(trainingPath.length - 1, progress.solved)];
+  const nextMilestone = getReadinessMilestones().find((item) => !item.complete);
   const plan = proActive
     ? [
         `${pathDay.title}: ${pathDay.focus}`,
         `${pathDay.tickets}. Score 80+ on ${ticket.id} if you can.`,
         `${pathDay.evidence} Then rehearse one answer about ${weakestSkill}.`,
+        nextMilestone ? `Checklist target: ${nextMilestone.label}.` : "Checklist complete. Keep your evidence fresh.",
       ]
     : [
         `${trainingPath[0].title}: ${trainingPath[0].focus}`,
         `Try ${ticket.id} as the Day 1 preview ticket.`,
-        "Subscribe to unlock Days 2-30, saved evidence, and interview drills.",
+        nextMilestone ? `Preview target: ${nextMilestone.label}.` : "Your proof pack is ready for review.",
       ];
 
   els.todayPlan.replaceChildren();
@@ -1585,6 +1667,37 @@ function renderEvidenceVault() {
     item.append(createTextElement("span", entry.summary));
     els.dashboardEvidenceList.append(item);
   });
+}
+
+function renderReadinessChecklist() {
+  const milestones = getReadinessMilestones();
+  const completed = milestones.filter((item) => item.complete).length;
+  const nextMilestone = milestones.find((item) => !item.complete);
+
+  els.readinessChecklist.replaceChildren();
+  els.readinessChecklistBadge.textContent = `${completed}/${milestones.length}`;
+
+  milestones.forEach((milestone) => {
+    const item = document.createElement("div");
+    item.className = `readiness-check${milestone.complete ? " is-complete" : ""}`;
+
+    const mark = createTextElement("span", milestone.complete ? "OK" : "", "readiness-check__mark");
+    const body = document.createElement("div");
+    body.className = "readiness-check__body";
+    body.append(createTextElement("strong", milestone.label));
+    body.append(createTextElement("span", milestone.detail));
+
+    item.append(mark, body, createTextElement("span", milestone.value, "readiness-check__value"));
+    els.readinessChecklist.append(item);
+  });
+
+  if (!nextMilestone) {
+    els.readinessChecklistCopy.textContent = "Proof pack complete. Keep adding recent tickets so your examples stay fresh.";
+  } else if (proActive) {
+    els.readinessChecklistCopy.textContent = `Next unlock: ${nextMilestone.label}. Today's shift should push that forward.`;
+  } else {
+    els.readinessChecklistCopy.textContent = `Free preview goal: ${nextMilestone.label}. Pro keeps the full checklist and reports moving.`;
+  }
 }
 
 function getWeeklyEvidence() {
@@ -1732,6 +1845,7 @@ function renderProDashboard() {
 
   renderTodayPlan();
   renderEvidenceVault();
+  renderReadinessChecklist();
   renderWeeklyReport();
   renderTrainingPath();
 }
@@ -2033,8 +2147,8 @@ function submitTicket() {
     ticketId: ticket.id,
     title: ticket.title,
     score: result.score,
-    summary: `${ticket.title}: scored ${result.score}/100 while practicing ${ticket.skills.join(", ")}.`,
-    interviewPrompt: `Tell me about a ${ticket.category.toLowerCase()} ticket where you had to balance urgency and safe process. Use ${ticket.title} as your example.`,
+    summary: buildEvidenceSummary(ticket, result),
+    interviewPrompt: buildInterviewPrompt(ticket),
     createdAt: new Date().toISOString(),
   });
   progress.evidence = progress.evidence.slice(0, 20);
