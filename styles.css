@@ -568,6 +568,17 @@ select:focus-visible {
   background: #e8f5f3;
 }
 
+.ticket-row--locked {
+  cursor: default;
+  border-style: dashed;
+  color: var(--muted);
+  background: #fff8eb;
+}
+
+.ticket-row--locked:hover {
+  transform: none;
+}
+
 .ticket-row__top {
   display: flex;
   justify-content: space-between;

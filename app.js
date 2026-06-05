@@ -310,6 +310,627 @@ const tickets = [
   },
 ];
 
+const proTicketTemplates = [
+  {
+    id: "SD-1604",
+    title: "Executive locked out before board call",
+    requester: "Nora V.",
+    role: "Executive assistant",
+    company: "Cobalt Finance",
+    channel: "Phone",
+    asset: "Okta + Microsoft 365",
+    slaMinutes: 15,
+    category: "Access",
+    priority: "P2",
+    customerNote: "The CFO is locked out after too many attempts and has a board call in 20 minutes. She changed phones last week and is getting impatient.",
+    signals: ["executive impact", "deadline risk", "identity control"],
+    kb: ["Executive urgency does not remove identity verification.", "Account lockouts with business deadline are usually P2.", "Document reset, MFA status, and user confirmation."],
+    correctActions: ["verify_identity", "reset_password", "reset_mfa", "confirm_with_user"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["verify_identity", "reset_password", "reset_mfa", "bypass_mfa", "ask_impact", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Identity", "SLA", "Communication"],
+    outcome: "Best path: verify identity, clear the lockout, reset or re-enroll MFA if approved, confirm access, and document the urgency and controls used.",
+    socialHook: "The CFO is locked out before a board call. Would you move fast or stay secure?",
+  },
+  {
+    id: "SD-1628",
+    title: "Sales team reports CRM outage",
+    requester: "Marcus J.",
+    role: "Sales director",
+    company: "ForgeWorks",
+    channel: "Teams",
+    asset: "CRM web app",
+    slaMinutes: 20,
+    category: "Incident",
+    priority: "P1",
+    customerNote: "Nobody on the sales floor can load the CRM. We have quotes due today and the page keeps timing out for everyone.",
+    signals: ["many users", "revenue impact", "service outage"],
+    kb: ["Multiple users with revenue impact can be P1.", "Check service health before local troubleshooting.", "Escalate with scope, timestamps, and sample affected users."],
+    correctActions: ["ask_impact", "check_status", "collect_logs", "escalate_network"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reset_password", "close_without_confirmation"],
+    actionPool: ["ask_impact", "check_status", "collect_logs", "escalate_network", "reset_password", "remote_session", "document_resolution", "close_without_confirmation"],
+    skills: ["SLA", "Escalation", "SaaS"],
+    outcome: "Best path: confirm scope and business impact, check CRM service status, collect timing and sample users, then escalate with a clear outage packet.",
+    socialHook: "A whole sales floor loses CRM access. This is where help desk triage gets real.",
+  },
+  {
+    id: "SD-1652",
+    title: "Shared mailbox access missing",
+    requester: "Elena P.",
+    role: "Clinic supervisor",
+    company: "Brightline Health",
+    channel: "Portal",
+    asset: "Microsoft 365 shared mailbox",
+    slaMinutes: 80,
+    category: "Service Request",
+    priority: "P3",
+    customerNote: "Two new schedulers cannot see the front desk shared mailbox. Their manager says they should have the same access as the rest of the team.",
+    signals: ["new users", "approval needed", "standard access"],
+    kb: ["Shared mailbox changes require manager approval or onboarding ticket.", "Use the approved group, not direct one-off permissions when possible.", "Confirm mailbox appears after access propagates."],
+    correctActions: ["get_manager_approval", "assign_license", "confirm_with_user", "document_resolution"],
+    preferredFirst: "get_manager_approval",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["get_manager_approval", "assign_license", "verify_identity", "reset_password", "bypass_mfa", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Access", "SaaS", "Documentation"],
+    outcome: "Best path: confirm approval, add users through the approved access group, wait for propagation, verify mailbox visibility, and document the change.",
+    socialHook: "A shared mailbox request sounds easy until permissions and approvals matter.",
+  },
+  {
+    id: "SD-1680",
+    title: "Suspicious QR code login page",
+    requester: "Dylan S.",
+    role: "Warehouse coordinator",
+    company: "Civic Retail",
+    channel: "Chat",
+    asset: "Email security",
+    slaMinutes: 18,
+    category: "Security",
+    priority: "P2",
+    customerNote: "I scanned a QR code from an email and it opened a Microsoft login page. I closed it before typing my password, but the sender looked real.",
+    signals: ["possible phishing", "QR code", "no credentials entered"],
+    kb: ["QR phishing should be treated as suspicious even without credential entry.", "Quarantine the message and collect headers.", "Coach the user and document whether credentials were entered."],
+    correctActions: ["quarantine_email", "collect_logs", "educate_user", "document_resolution"],
+    preferredFirst: "quarantine_email",
+    dangerousActions: ["ignore_security", "close_without_confirmation"],
+    actionPool: ["quarantine_email", "collect_logs", "reset_password", "ignore_security", "educate_user", "document_resolution", "remote_session", "close_without_confirmation"],
+    skills: ["Security", "Communication", "Documentation"],
+    outcome: "Best path: quarantine the email, collect headers and URL evidence, confirm no credentials were entered, coach the user, and document containment.",
+    socialHook: "QR-code phishing is sneaky. The user did one thing right: they reported it.",
+  },
+  {
+    id: "SD-1701",
+    title: "VPN works on hotspot but not home Wi-Fi",
+    requester: "Tanya L.",
+    role: "Claims analyst",
+    company: "Harbor Energy",
+    channel: "Phone",
+    asset: "GlobalProtect VPN",
+    slaMinutes: 40,
+    category: "Network",
+    priority: "P3",
+    customerNote: "VPN connects when I use my phone hotspot, but at home Wi-Fi it fails with a portal error. I can work for now, but I need my normal setup fixed.",
+    signals: ["single user", "workaround exists", "network clue"],
+    kb: ["A working hotspot suggests local network or DNS issue.", "Collect client version, error, and home network details.", "Escalate only after basic VPN checks and logs."],
+    correctActions: ["ask_impact", "test_vpn", "collect_logs", "document_resolution"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "test_vpn", "collect_logs", "check_status", "reboot_server", "reset_password", "document_resolution", "close_without_confirmation"],
+    skills: ["Network", "Troubleshooting", "Documentation"],
+    outcome: "Best path: confirm workaround and impact, test VPN settings, collect logs and error details, then document local-network evidence or escalate with facts.",
+    socialHook: "VPN fails on home Wi-Fi but works on hotspot. That clue changes the whole ticket.",
+  },
+  {
+    id: "SD-1724",
+    title: "Teams audio fails before interview panel",
+    requester: "Jae M.",
+    role: "Recruiting lead",
+    company: "Northstar Foods",
+    channel: "Teams",
+    asset: "Windows laptop + Teams",
+    slaMinutes: 25,
+    category: "Incident",
+    priority: "P2",
+    customerNote: "My Teams audio is not detecting my headset and I have an interview panel in 30 minutes. The headset works on my phone.",
+    signals: ["deadline risk", "single device", "workaround clue"],
+    kb: ["Meeting-impact audio issues can be P2 when deadline is near.", "Check Teams device settings, Windows input/output, and driver status.", "Confirm with a test call before closing."],
+    correctActions: ["remote_session", "search_kb", "confirm_with_user", "document_resolution"],
+    preferredFirst: "remote_session",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["remote_session", "search_kb", "collect_logs", "reset_password", "reboot_server", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Windows", "Troubleshooting", "Communication"],
+    outcome: "Best path: remote in with consent, check Teams and Windows audio settings, apply the approved driver/device fix, run a test call, and document.",
+    socialHook: "A headset dies before an interview panel. The fix starts with the simplest checks.",
+  },
+  {
+    id: "SD-1756",
+    title: "Badge printer jams after driver update",
+    requester: "Rina F.",
+    role: "Facilities coordinator",
+    company: "Atlas Supply",
+    channel: "Portal",
+    asset: "ID badge printer",
+    slaMinutes: 55,
+    category: "Hardware",
+    priority: "P3",
+    customerNote: "The badge printer started jamming after yesterday's driver update. We can print visitor badges at the security desk, but onboarding is slower.",
+    signals: ["single device", "workaround exists", "driver update clue"],
+    kb: ["Check physical media path before blaming drivers.", "Use known-good driver rollback only after confirming update history.", "Confirm a successful test badge."],
+    correctActions: ["ask_impact", "search_kb", "confirm_with_user", "document_resolution"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "search_kb", "remote_session", "collect_logs", "reboot_server", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Hardware", "Troubleshooting", "Documentation"],
+    outcome: "Best path: confirm impact and workaround, check jam/media basics, compare driver history against the KB, print a test badge, and document.",
+    socialHook: "Not every printer problem is a network problem. This one has a driver clue.",
+  },
+  {
+    id: "SD-1783",
+    title: "New laptop missing encryption status",
+    requester: "Caleb N.",
+    role: "IT asset tech",
+    company: "Cobalt Finance",
+    channel: "Portal",
+    asset: "Windows laptop",
+    slaMinutes: 120,
+    category: "Security",
+    priority: "P3",
+    customerNote: "A new laptop shows as not encrypted in the device dashboard. The user is remote and scheduled to receive client files this afternoon.",
+    signals: ["security control", "single device", "client data risk"],
+    kb: ["Device encryption gaps require evidence before closing.", "Collect device ID, last check-in, and encryption state.", "Escalate endpoint security if policy will not apply."],
+    correctActions: ["collect_logs", "check_status", "escalate_network", "document_resolution"],
+    preferredFirst: "collect_logs",
+    dangerousActions: ["ignore_security", "close_without_confirmation"],
+    actionPool: ["collect_logs", "check_status", "remote_session", "ignore_security", "escalate_network", "document_resolution", "confirm_with_user", "close_without_confirmation"],
+    skills: ["Security", "Windows", "Escalation"],
+    outcome: "Best path: collect device facts and dashboard status, force/check policy sync if approved, escalate endpoint security with evidence, and document risk handling.",
+    socialHook: "A laptop says encryption is off before client files arrive. That is not a close-and-hope ticket.",
+  },
+  {
+    id: "SD-1810",
+    title: "Finance user needs urgent ERP role",
+    requester: "Mei H.",
+    role: "Controller",
+    company: "ForgeWorks",
+    channel: "Phone",
+    asset: "ERP permissions",
+    slaMinutes: 50,
+    category: "Access",
+    priority: "P2",
+    customerNote: "A finance analyst needs invoice approval rights today because month-end close is blocked. Their manager is traveling but sent a quick Teams message approving it.",
+    signals: ["approval ambiguity", "financial access", "deadline risk"],
+    kb: ["Financial system access requires approved workflow or manager approval record.", "Use least-privilege role matching the task.", "Document approval source and role assigned."],
+    correctActions: ["get_manager_approval", "assign_license", "confirm_with_user", "document_resolution"],
+    preferredFirst: "get_manager_approval",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["get_manager_approval", "assign_license", "verify_identity", "bypass_mfa", "reset_password", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Access", "SaaS", "SLA"],
+    outcome: "Best path: capture/validate approval, assign the least-privilege ERP role, confirm access works, and document the approval and entitlement.",
+    socialHook: "Month-end close is blocked. Would you grant finance access from a Teams message?",
+  },
+  {
+    id: "SD-1842",
+    title: "Password reset request from personal email",
+    requester: "Unknown sender",
+    role: "Claims analyst",
+    company: "Harbor Energy",
+    channel: "Email",
+    asset: "Identity provider",
+    slaMinutes: 35,
+    category: "Security",
+    priority: "P2",
+    customerNote: "Hi, I lost access to my work email and need a password reset. Please send a reset link to this Gmail address.",
+    signals: ["identity risk", "personal email", "account access"],
+    kb: ["Never reset credentials based only on personal email.", "Use approved identity verification path.", "Escalate suspicious reset requests if verification fails."],
+    correctActions: ["verify_identity", "ask_impact", "document_resolution", "educate_user"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["reset_password", "bypass_mfa"],
+    actionPool: ["verify_identity", "ask_impact", "reset_password", "bypass_mfa", "educate_user", "document_resolution", "close_without_confirmation", "collect_logs"],
+    skills: ["Identity", "Security", "Communication"],
+    outcome: "Best path: refuse shortcut reset, route through approved identity verification, document the request, and coach the user on the secure recovery path.",
+    socialHook: "A password reset request comes from Gmail. Helpful and secure are not the same thing.",
+  },
+  {
+    id: "SD-1866",
+    title: "Conference room display blank",
+    requester: "Alicia D.",
+    role: "Office manager",
+    company: "Northstar Foods",
+    channel: "Walk-up",
+    asset: "Conference room AV",
+    slaMinutes: 30,
+    category: "Hardware",
+    priority: "P2",
+    customerNote: "The boardroom screen is blank and leadership has a vendor presentation in 25 minutes. The laptop detects the display but nothing shows.",
+    signals: ["meeting deadline", "single room", "hardware path"],
+    kb: ["Meeting-room issues near executive sessions can be P2.", "Check input source, cable, adapter, and display detection.", "Confirm with the presenter's laptop before closing."],
+    correctActions: ["ask_impact", "remote_session", "confirm_with_user", "document_resolution"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "remote_session", "search_kb", "reboot_server", "assign_license", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Hardware", "Communication", "SLA"],
+    outcome: "Best path: confirm deadline and room scope, check input/cable/adapter basics, test the presenter's laptop, confirm display output, and document.",
+    socialHook: "The boardroom display dies before a vendor presentation. Time pressure changes priority.",
+  },
+  {
+    id: "SD-1894",
+    title: "User cannot access payroll after name change",
+    requester: "Sofia G.",
+    role: "HR generalist",
+    company: "Brightline Health",
+    channel: "Portal",
+    asset: "Payroll + SSO",
+    slaMinutes: 75,
+    category: "Access",
+    priority: "P3",
+    customerNote: "An employee's legal name changed last week. Email works, but payroll says the account does not match. They need paystub access today.",
+    signals: ["identity data mismatch", "single user", "HR system"],
+    kb: ["Name changes can create app attribute mismatch.", "Validate HR source record before editing app access.", "Confirm payroll login and document attribute sync."],
+    correctActions: ["verify_identity", "search_kb", "confirm_with_user", "document_resolution"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["verify_identity", "search_kb", "assign_license", "bypass_mfa", "reset_password", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Identity", "SaaS", "Documentation"],
+    outcome: "Best path: verify the request and HR source data, follow the attribute sync KB, confirm payroll access, and document the identity change handling.",
+    socialHook: "A name change breaks payroll login. This is identity work, not just a password reset.",
+  },
+  {
+    id: "SD-1912",
+    title: "Branch office phones offline",
+    requester: "Owen B.",
+    role: "Branch manager",
+    company: "Atlas Supply",
+    channel: "Phone",
+    asset: "VoIP phones",
+    slaMinutes: 15,
+    category: "Network",
+    priority: "P1",
+    customerNote: "Every desk phone in the branch says network unavailable. Internet is working on laptops, but customers cannot reach the front desk.",
+    signals: ["many users", "customer contact", "network dependency"],
+    kb: ["Voice outage affecting a branch can be P1.", "Collect scope, switch/phone symptoms, and timestamp.", "Escalate to network/voice with business impact."],
+    correctActions: ["ask_impact", "check_status", "collect_logs", "escalate_network"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reset_password", "close_without_confirmation"],
+    actionPool: ["ask_impact", "check_status", "collect_logs", "escalate_network", "reset_password", "reboot_server", "document_resolution", "close_without_confirmation"],
+    skills: ["Network", "Escalation", "SLA"],
+    outcome: "Best path: confirm branch-wide voice impact, check voice status, gather symptoms and timestamps, then escalate with customer impact clearly documented.",
+    socialHook: "The internet works, but every desk phone is down. Would you call it P1?",
+  },
+  {
+    id: "SD-1930",
+    title: "Endpoint alert after browser extension install",
+    requester: "Security alert",
+    role: "Automated detection",
+    company: "Cobalt Finance",
+    channel: "Portal",
+    asset: "Endpoint security",
+    slaMinutes: 12,
+    category: "Security",
+    priority: "P1",
+    customerNote: "Endpoint security flagged a browser extension install on a finance laptop. The alert says credential access behavior observed.",
+    signals: ["security alert", "finance device", "credential risk"],
+    kb: ["High-risk endpoint alerts require containment first.", "Collect alert ID, device, user, and timeline.", "Escalate security incidents with containment status."],
+    correctActions: ["collect_logs", "quarantine_email", "escalate_network", "document_resolution"],
+    preferredFirst: "collect_logs",
+    dangerousActions: ["ignore_security", "close_without_confirmation"],
+    actionPool: ["collect_logs", "quarantine_email", "ignore_security", "escalate_network", "remote_session", "document_resolution", "educate_user", "close_without_confirmation"],
+    skills: ["Security", "Escalation", "SLA"],
+    outcome: "Best path: collect alert evidence, contain the endpoint per policy, escalate to security with timeline and device facts, and document containment.",
+    socialHook: "A finance laptop triggers credential-access behavior. This is where containment beats curiosity.",
+  },
+  {
+    id: "SD-1955",
+    title: "OneDrive sync stuck for legal folder",
+    requester: "Imani K.",
+    role: "Legal assistant",
+    company: "Civic Retail",
+    channel: "Chat",
+    asset: "OneDrive",
+    slaMinutes: 60,
+    category: "Incident",
+    priority: "P3",
+    customerNote: "OneDrive has been stuck syncing a legal folder all morning. I can open files online, but local edits are not uploading.",
+    signals: ["single user", "workaround exists", "data sync"],
+    kb: ["Confirm web access before local sync repair.", "Check sync client status, path length, and storage errors.", "Confirm file sync after repair before closing."],
+    correctActions: ["ask_impact", "search_kb", "confirm_with_user", "document_resolution"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "search_kb", "collect_logs", "remote_session", "reboot_server", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["SaaS", "Windows", "Troubleshooting"],
+    outcome: "Best path: confirm workaround and impact, inspect sync status with the KB, apply approved repair, verify upload, and document.",
+    socialHook: "OneDrive sync is stuck, but web access works. That workaround changes the priority.",
+  },
+  {
+    id: "SD-1988",
+    title: "Guest Wi-Fi down for training event",
+    requester: "Hector R.",
+    role: "Training coordinator",
+    company: "ForgeWorks",
+    channel: "Teams",
+    asset: "Guest Wi-Fi",
+    slaMinutes: 20,
+    category: "Network",
+    priority: "P2",
+    customerNote: "External trainees cannot join guest Wi-Fi in room 4B. Employee Wi-Fi works. The class starts in 30 minutes.",
+    signals: ["external users", "event deadline", "network segmentation"],
+    kb: ["Guest Wi-Fi issues can be P2 when an event is blocked.", "Check service status and scope before changing network settings.", "Escalate with SSID, room, time, and affected devices."],
+    correctActions: ["ask_impact", "check_status", "test_vpn", "escalate_network"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reset_password", "close_without_confirmation"],
+    actionPool: ["ask_impact", "check_status", "test_vpn", "collect_logs", "escalate_network", "reset_password", "document_resolution", "close_without_confirmation"],
+    skills: ["Network", "Escalation", "Communication"],
+    outcome: "Best path: confirm event impact and scope, check guest network status, test from the room, escalate with SSID/location/time facts, and communicate workaround options.",
+    socialHook: "Guest Wi-Fi fails before a class. Not all network tickets are equal.",
+  },
+  {
+    id: "SD-2014",
+    title: "Manager wants departed user mailbox",
+    requester: "Graham T.",
+    role: "Operations manager",
+    company: "Northstar Foods",
+    channel: "Portal",
+    asset: "Microsoft 365 mailbox",
+    slaMinutes: 120,
+    category: "Access",
+    priority: "P3",
+    customerNote: "My former team member left yesterday. I need access to their mailbox today to find customer emails.",
+    signals: ["departed user", "approval required", "mailbox access"],
+    kb: ["Departed-user mailbox access requires HR/legal or manager approval workflow.", "Use delegated access or eDiscovery process per policy.", "Document approval and access duration."],
+    correctActions: ["get_manager_approval", "assign_license", "document_resolution", "confirm_with_user"],
+    preferredFirst: "get_manager_approval",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["get_manager_approval", "assign_license", "verify_identity", "bypass_mfa", "reset_password", "document_resolution", "confirm_with_user", "close_without_confirmation"],
+    skills: ["Access", "Documentation", "Security"],
+    outcome: "Best path: verify the approved offboarding/mailbox workflow, grant the correct delegated access if approved, confirm access, and document duration and approval.",
+    socialHook: "A manager asks for a departed user's mailbox. Helpful support still follows policy.",
+  },
+  {
+    id: "SD-2047",
+    title: "Blue screen during client presentation",
+    requester: "Victor A.",
+    role: "Account manager",
+    company: "Harbor Energy",
+    channel: "Phone",
+    asset: "Windows laptop",
+    slaMinutes: 20,
+    category: "Incident",
+    priority: "P2",
+    customerNote: "My laptop blue-screened twice during a client presentation. I am on a loaner now, but I need the files and my main laptop stable before the follow-up at 2 PM.",
+    signals: ["client deadline", "workaround exists", "repeat crash"],
+    kb: ["Repeat crashes before customer meetings can be P2.", "Collect stop code and update history.", "Use loaner/workaround while investigating stability."],
+    correctActions: ["collect_logs", "search_kb", "confirm_with_user", "document_resolution"],
+    preferredFirst: "collect_logs",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["collect_logs", "search_kb", "remote_session", "reset_password", "reboot_server", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Windows", "SLA", "Troubleshooting"],
+    outcome: "Best path: preserve the workaround, collect crash evidence, follow the approved rollback/repair path, confirm stability or escalate with stop codes, and document.",
+    socialHook: "A laptop crashes mid-client presentation. The workaround matters as much as the fix.",
+  },
+  {
+    id: "SD-2070",
+    title: "Inventory scanner cannot sign in",
+    requester: "Paula W.",
+    role: "Warehouse supervisor",
+    company: "Civic Retail",
+    channel: "Walk-up",
+    asset: "Android inventory scanner",
+    slaMinutes: 45,
+    category: "Hardware",
+    priority: "P2",
+    customerNote: "The scanner for aisle 7 cannot sign into the inventory app. Other scanners work, but this aisle handles same-day orders.",
+    signals: ["one device", "operations impact", "workaround exists"],
+    kb: ["Single scanner issues with operations impact are often P2.", "Check device network, app version, and assigned user.", "Confirm inventory scan succeeds before closing."],
+    correctActions: ["ask_impact", "remote_session", "confirm_with_user", "document_resolution"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "remote_session", "reset_password", "search_kb", "reboot_server", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Hardware", "Access", "Troubleshooting"],
+    outcome: "Best path: confirm operational impact, check scanner app/network/account basics, test a successful scan, and document the device-specific fix.",
+    socialHook: "One scanner is down, but same-day orders depend on it. Priority is about impact.",
+  },
+  {
+    id: "SD-2099",
+    title: "User reports impossible travel sign-in",
+    requester: "Identity alert",
+    role: "Automated detection",
+    company: "Brightline Health",
+    channel: "Portal",
+    asset: "Identity provider",
+    slaMinutes: 10,
+    category: "Security",
+    priority: "P1",
+    customerNote: "Identity protection flagged a successful sign-in from another country five minutes after a local sign-in. The user is currently in clinic.",
+    signals: ["identity alert", "possible compromise", "active session"],
+    kb: ["Impossible travel with successful sign-in requires rapid containment.", "Verify user context, revoke sessions, and reset credentials per policy.", "Document containment and escalate security."],
+    correctActions: ["verify_identity", "reset_password", "reset_mfa", "document_resolution"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["ignore_security", "close_without_confirmation"],
+    actionPool: ["verify_identity", "reset_password", "reset_mfa", "ignore_security", "collect_logs", "document_resolution", "educate_user", "close_without_confirmation"],
+    skills: ["Identity", "Security", "SLA"],
+    outcome: "Best path: verify the user, contain the account by revoking/resetting per policy, re-enroll MFA if needed, escalate security, and document the timeline.",
+    socialHook: "Impossible travel sign-in alert. This is the kind of ticket that needs speed and discipline.",
+  },
+  {
+    id: "SD-2123",
+    title: "License limit blocks design team",
+    requester: "Marta E.",
+    role: "Creative director",
+    company: "Cobalt Finance",
+    channel: "Portal",
+    asset: "Adobe licenses",
+    slaMinutes: 90,
+    category: "Service Request",
+    priority: "P3",
+    customerNote: "Two designers cannot open Adobe apps because we hit a license limit. They need access for a campaign review tomorrow morning.",
+    signals: ["license capacity", "team deadline", "approval needed"],
+    kb: ["License increases require approval or reclaim from inactive users.", "Check assignment group and available seats.", "Confirm app launch after assignment."],
+    correctActions: ["get_manager_approval", "assign_license", "confirm_with_user", "document_resolution"],
+    preferredFirst: "get_manager_approval",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["get_manager_approval", "assign_license", "search_kb", "bypass_mfa", "reset_password", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["SaaS", "Access", "Documentation"],
+    outcome: "Best path: validate approval, check seat availability or reclaim process, assign licenses through the approved group, confirm app launch, and document.",
+    socialHook: "The design team hits a license limit. The answer is not just 'buy more seats.'",
+  },
+  {
+    id: "SD-2148",
+    title: "Shared drive slow for one department",
+    requester: "Nikhil B.",
+    role: "Engineering manager",
+    company: "Atlas Supply",
+    channel: "Teams",
+    asset: "File share",
+    slaMinutes: 35,
+    category: "Network",
+    priority: "P2",
+    customerNote: "Engineering says the shared drive is painfully slow, but other departments seem okay. They are trying to release drawings before noon.",
+    signals: ["department impact", "deadline risk", "file share"],
+    kb: ["Department-specific slowness needs scope and sample paths.", "Collect timestamps, affected users, and network location.", "Escalate storage/network with evidence."],
+    correctActions: ["ask_impact", "collect_logs", "check_status", "escalate_network"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "collect_logs", "check_status", "escalate_network", "reboot_server", "reset_password", "document_resolution", "close_without_confirmation"],
+    skills: ["Network", "Escalation", "Troubleshooting"],
+    outcome: "Best path: confirm scope and deadline, collect sample users/paths/timestamps, check service status, then escalate with evidence if not a local issue.",
+    socialHook: "Only engineering says the file share is slow. Scope is the clue.",
+  },
+  {
+    id: "SD-2175",
+    title: "Calendar delegate permissions wrong",
+    requester: "Lana C.",
+    role: "Administrative assistant",
+    company: "Harbor Energy",
+    channel: "Chat",
+    asset: "Outlook calendar",
+    slaMinutes: 70,
+    category: "Service Request",
+    priority: "P3",
+    customerNote: "I can view the VP's calendar but cannot create meetings. I should have editor access like the previous assistant.",
+    signals: ["delegated access", "approval needed", "role change"],
+    kb: ["Calendar delegate permissions require owner or manager approval.", "Use the documented permission level, not broad mailbox access.", "Confirm the delegate can create a test meeting."],
+    correctActions: ["get_manager_approval", "assign_license", "confirm_with_user", "document_resolution"],
+    preferredFirst: "get_manager_approval",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["get_manager_approval", "assign_license", "verify_identity", "bypass_mfa", "reset_password", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Access", "SaaS", "Communication"],
+    outcome: "Best path: confirm approval from the calendar owner/manager, set the right delegate permission, test meeting creation, and document.",
+    socialHook: "Calendar access sounds small until you grant the wrong mailbox permission.",
+  },
+  {
+    id: "SD-2206",
+    title: "Remote employee cannot enroll device",
+    requester: "Kira Y.",
+    role: "New data analyst",
+    company: "ForgeWorks",
+    channel: "Phone",
+    asset: "MDM enrollment",
+    slaMinutes: 65,
+    category: "Access",
+    priority: "P3",
+    customerNote: "My new laptop says device enrollment failed. I can log into email on the web, but company apps are blocked until enrollment works.",
+    signals: ["new hire", "device enrollment", "workaround partial"],
+    kb: ["MDM enrollment needs identity, license, and device compliance checks.", "Collect error code and device serial.", "Confirm compliance state before closing."],
+    correctActions: ["verify_identity", "collect_logs", "confirm_with_user", "document_resolution"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["verify_identity", "collect_logs", "assign_license", "bypass_mfa", "remote_session", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Access", "Windows", "Documentation"],
+    outcome: "Best path: verify the user, collect enrollment error and device facts, correct licensing/compliance issue if approved, confirm enrollment, and document.",
+    socialHook: "A new hire can use webmail but not company apps. Device enrollment is the bottleneck.",
+  },
+  {
+    id: "SD-2231",
+    title: "Payment terminal loses network",
+    requester: "Omar G.",
+    role: "Warehouse lead",
+    company: "Civic Retail",
+    channel: "Phone",
+    asset: "Payment terminal",
+    slaMinutes: 15,
+    category: "Network",
+    priority: "P1",
+    customerNote: "The pickup counter payment terminal cannot connect. The line is growing and staff cannot take card payments at that station.",
+    signals: ["customer-facing", "payment impact", "network device"],
+    kb: ["Payment-impacting device outages can be P1.", "Check whether issue is one terminal or all terminals.", "Escalate payment/network issues with lane, device ID, and timestamp."],
+    correctActions: ["ask_impact", "check_status", "collect_logs", "escalate_network"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reset_password", "close_without_confirmation"],
+    actionPool: ["ask_impact", "check_status", "collect_logs", "escalate_network", "reset_password", "reboot_server", "document_resolution", "close_without_confirmation"],
+    skills: ["Network", "SLA", "Escalation"],
+    outcome: "Best path: confirm customer/payment impact and scope, collect terminal ID and errors, check service/network status, and escalate with urgent business context.",
+    socialHook: "Card payments stop at pickup. This is how business impact sets priority.",
+  },
+  {
+    id: "SD-2260",
+    title: "User opened password-protected zip",
+    requester: "Jon R.",
+    role: "Accounts payable clerk",
+    company: "Northstar Foods",
+    channel: "Portal",
+    asset: "Email security",
+    slaMinutes: 15,
+    category: "Security",
+    priority: "P1",
+    customerNote: "I opened a password-protected zip from a vendor invoice email and ran the file inside. It flashed a window and disappeared.",
+    signals: ["malware risk", "attachment executed", "finance user"],
+    kb: ["Executed suspicious attachments require containment.", "Collect message, attachment details, endpoint, and timeline.", "Escalate to security after containment steps."],
+    correctActions: ["collect_logs", "quarantine_email", "escalate_network", "document_resolution"],
+    preferredFirst: "collect_logs",
+    dangerousActions: ["ignore_security", "close_without_confirmation"],
+    actionPool: ["collect_logs", "quarantine_email", "ignore_security", "escalate_network", "reset_password", "educate_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Security", "Escalation", "Communication"],
+    outcome: "Best path: contain the endpoint per policy, preserve email and attachment evidence, escalate to security with timeline, coach the user, and document.",
+    socialHook: "A user ran a file from a password-protected zip. That is a high-risk security ticket.",
+  },
+  {
+    id: "SD-2287",
+    title: "Zoom room camera points at ceiling",
+    requester: "Claire T.",
+    role: "Office coordinator",
+    company: "Brightline Health",
+    channel: "Teams",
+    asset: "Zoom Room",
+    slaMinutes: 45,
+    category: "Hardware",
+    priority: "P3",
+    customerNote: "The clinic conference room camera points at the ceiling after yesterday's meeting. We have a remote leadership check-in later today.",
+    signals: ["room device", "meeting later", "configuration issue"],
+    kb: ["Room camera issues are usually P3 unless meeting is urgent.", "Check room controller presets and camera connection.", "Confirm video framing in a test meeting."],
+    correctActions: ["ask_impact", "remote_session", "confirm_with_user", "document_resolution"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "remote_session", "search_kb", "reboot_server", "assign_license", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Hardware", "Troubleshooting", "Communication"],
+    outcome: "Best path: confirm meeting timing, check camera presets/controller, test video framing, confirm with the requester, and document.",
+    socialHook: "A conference room camera points at the ceiling. Small issue, real user experience.",
+  },
+  {
+    id: "SD-2314",
+    title: "Employee cannot access benefits portal",
+    requester: "Ravi S.",
+    role: "Lab technician",
+    company: "Brightline Health",
+    channel: "Chat",
+    asset: "Benefits portal",
+    slaMinutes: 90,
+    category: "Access",
+    priority: "P3",
+    customerNote: "Open enrollment ends tomorrow and I cannot access the benefits portal. It says my account is inactive, but my company login works.",
+    signals: ["deadline tomorrow", "single user", "app entitlement"],
+    kb: ["Benefits portal issues near enrollment deadline require timely handling.", "Check HR eligibility feed before changing access.", "Confirm portal login and document source-system status."],
+    correctActions: ["verify_identity", "search_kb", "confirm_with_user", "document_resolution"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["verify_identity", "search_kb", "assign_license", "reset_password", "bypass_mfa", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Access", "SaaS", "SLA"],
+    outcome: "Best path: verify the user, check HR/source eligibility against the KB, restore entitlement through the approved path, confirm login, and document.",
+    socialHook: "Open enrollment ends tomorrow and the portal says inactive. Good triage protects the deadline.",
+  },
+];
+
+tickets.push(...proTicketTemplates);
+
 const skillNames = [
   "Identity",
   "SLA",
@@ -324,6 +945,8 @@ const skillNames = [
   "SaaS",
   "Windows",
 ];
+
+const FREE_TICKET_LIMIT = 6;
 
 const trainingPath = [
   { day: 1, title: "Ticket Triage", focus: "Read the request, find impact, choose category.", tickets: "2 guided tickets", evidence: "Write one clean issue summary." },
@@ -356,6 +979,39 @@ const trainingPath = [
   { day: 28, title: "Mock First Shift", focus: "Run a realistic queue without guidance.", tickets: "5 speedrun tickets", evidence: "Save your top two cases." },
   { day: 29, title: "Resume Evidence", focus: "Turn scored cases into honest resume proof.", tickets: "2 review tickets", evidence: "Draft three resume bullets." },
   { day: 30, title: "Final Readiness Check", focus: "Prove consistent triage, action, and documentation.", tickets: "5 mixed tickets", evidence: "Export your final proof summary." },
+];
+
+const pathSkillMap = [
+  ["SLA", "Documentation", "Communication"],
+  ["SLA", "Escalation"],
+  ["Identity", "Access"],
+  ["Identity", "Access"],
+  ["Security", "Communication"],
+  ["Network", "Escalation"],
+  ["Mixed"],
+  ["Hardware", "Troubleshooting"],
+  ["SaaS", "Access"],
+  ["Communication", "Troubleshooting"],
+  ["Escalation", "Network"],
+  ["Communication", "Documentation"],
+  ["Windows", "Troubleshooting"],
+  ["Mixed"],
+  ["SLA", "Escalation"],
+  ["SaaS", "Access"],
+  ["Security", "Documentation"],
+  ["Hardware", "Troubleshooting"],
+  ["Documentation", "Troubleshooting"],
+  ["SLA", "Communication"],
+  ["Mixed"],
+  ["Communication", "Documentation"],
+  ["Documentation"],
+  ["Communication"],
+  ["Mixed"],
+  ["Escalation", "Communication"],
+  ["Troubleshooting"],
+  ["Mixed"],
+  ["Documentation", "Communication"],
+  ["Mixed"],
 ];
 
 const els = {
@@ -509,9 +1165,56 @@ function renderSkills() {
   });
 }
 
+function getCurrentPathDayIndex() {
+  return Math.min(trainingPath.length - 1, Math.max(0, progress.solved));
+}
+
+function getCurrentPathSkills() {
+  return pathSkillMap[getCurrentPathDayIndex()] || ["Mixed"];
+}
+
+function getTicketMatchScore(ticket, pathSkills) {
+  if (pathSkills.includes("Mixed")) {
+    return 1;
+  }
+
+  return pathSkills.reduce((score, skill) => {
+    const skillMatch = ticket.skills.includes(skill) ? 3 : 0;
+    const categoryMatch = ticket.category === skill ? 2 : 0;
+    const titleMatch = ticket.title.toLowerCase().includes(skill.toLowerCase()) ? 1 : 0;
+    return score + skillMatch + categoryMatch + titleMatch;
+  }, 0);
+}
+
+function getAvailableTicketIndexes() {
+  return tickets
+    .map((ticket, index) => ({ ticket, index }))
+    .filter(({ index }) => proActive || index < FREE_TICKET_LIMIT)
+    .map(({ index }) => index);
+}
+
+function getQueueTicketIndexes() {
+  const availableIndexes = getAvailableTicketIndexes();
+  if (!proActive) {
+    return availableIndexes;
+  }
+
+  const pathSkills = getCurrentPathSkills();
+  const ranked = availableIndexes
+    .map((index) => ({ index, score: getTicketMatchScore(tickets[index], pathSkills) }))
+    .sort((first, second) => second.score - first.score || first.index - second.index);
+  const recommended = ranked.filter((item) => item.score > 0).map((item) => item.index);
+  const fallback = ranked.filter((item) => item.score <= 0).map((item) => item.index);
+
+  return [...recommended, ...fallback].slice(0, 12);
+}
+
 function renderQueue() {
   els.ticketQueue.replaceChildren();
-  tickets.forEach((ticket, index) => {
+  const queueIndexes = getQueueTicketIndexes();
+
+  queueIndexes.forEach((index) => {
+    const ticket = tickets[index];
     const button = document.createElement("button");
     button.type = "button";
     button.className = `ticket-row${index === activeTicketIndex ? " is-active" : ""}`;
@@ -530,9 +1233,22 @@ function renderQueue() {
     button.append(createTextElement("span", ticket.category));
     els.ticketQueue.append(button);
   });
+
+  if (!proActive) {
+    const locked = document.createElement("div");
+    locked.className = "ticket-row ticket-row--locked";
+    locked.append(createTextElement("span", "Pro unlocks 28 more realistic tickets", "ticket-row__title"));
+    locked.append(createTextElement("span", "VPN, phishing, Windows, SaaS, access, hardware, and escalation cases."));
+    els.ticketQueue.append(locked);
+  }
 }
 
 function loadTicket(index) {
+  const availableIndexes = getAvailableTicketIndexes();
+  if (!availableIndexes.includes(index)) {
+    index = availableIndexes[0] || 0;
+  }
+
   activeTicketIndex = index;
   selectedActions = new Set();
   submitted = false;
@@ -678,7 +1394,8 @@ function getWeakestSkill() {
 }
 
 function renderTodayPlan() {
-  const ticket = tickets[activeTicketIndex];
+  const recommendedTicketIndex = getQueueTicketIndexes()[0] ?? activeTicketIndex;
+  const ticket = tickets[recommendedTicketIndex];
   const weakestSkill = getWeakestSkill();
   const pathDay = trainingPath[Math.min(trainingPath.length - 1, progress.solved)];
   const plan = proActive
@@ -772,6 +1489,8 @@ function renderProDashboard() {
   const rampDay = Math.min(30, Math.max(1, progress.solved + 1));
   const completedRampDays = Math.min(30, progress.solved);
   const latestEvidence = progress.evidence[0];
+  const recommendedTicketIndex = getQueueTicketIndexes()[0] ?? activeTicketIndex;
+  const recommendedTicket = tickets[recommendedTicketIndex];
 
   els.proDashboard.classList.toggle("is-pro-active", proActive);
   els.dashboardBadge.textContent = proActive ? "Pro Active" : "Free Preview";
@@ -785,7 +1504,7 @@ function renderProDashboard() {
   els.rampCopy.textContent = `${completedRampDays} of 30 ramp days completed.`;
   els.dashboardInterview.textContent = latestEvidence
     ? latestEvidence.interviewPrompt
-    : `Practice explaining why ${tickets[activeTicketIndex].title} is a ${tickets[activeTicketIndex].priority} and what you would do first.`;
+    : `Practice explaining why ${recommendedTicket.title} is a ${recommendedTicket.priority} and what you would do first.`;
   els.dashboardPrimaryBtn.textContent = proActive ? "Start Today's Shift" : "Unlock Pro";
 
   renderTodayPlan();
@@ -814,6 +1533,9 @@ function setProState(entitlement, email) {
   localStorage.setItem("ticketReadyProActive", String(proActive));
   if (email) {
     localStorage.setItem("ticketReadyLastEmail", email);
+  }
+  if (!getAvailableTicketIndexes().includes(activeTicketIndex)) {
+    loadTicket(getAvailableTicketIndexes()[0] || 0);
   }
   renderProState(email);
 }
@@ -940,19 +1662,22 @@ function submitTicket() {
 }
 
 function chooseNextTicket() {
-  const nextIndex = (activeTicketIndex + 1) % tickets.length;
-  loadTicket(nextIndex);
+  const queueIndexes = getQueueTicketIndexes();
+  const currentQueuePosition = queueIndexes.indexOf(activeTicketIndex);
+  const nextQueuePosition = currentQueuePosition >= 0 ? (currentQueuePosition + 1) % queueIndexes.length : 0;
+  loadTicket(queueIndexes[nextQueuePosition] || 0);
 }
 
 function chooseRandomTicket() {
-  if (tickets.length <= 1) {
-    loadTicket(0);
+  const queueIndexes = getQueueTicketIndexes();
+  if (queueIndexes.length <= 1) {
+    loadTicket(queueIndexes[0] || 0);
     return;
   }
 
   let nextIndex = activeTicketIndex;
   while (nextIndex === activeTicketIndex) {
-    nextIndex = Math.floor(Math.random() * tickets.length);
+    nextIndex = queueIndexes[Math.floor(Math.random() * queueIndexes.length)];
   }
   loadTicket(nextIndex);
 }
