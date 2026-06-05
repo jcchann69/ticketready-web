@@ -15,6 +15,20 @@ const dataDir = path.join(__dirname, "data");
 const subscriptionStorePath = path.join(dataDir, "subscriptions.json");
 const profileStorePath = path.join(dataDir, "profiles.json");
 const envPath = path.join(__dirname, ".env");
+const progressSkillNames = [
+  "Identity",
+  "SLA",
+  "Documentation",
+  "Network",
+  "Escalation",
+  "Security",
+  "Communication",
+  "Troubleshooting",
+  "Hardware",
+  "Access",
+  "SaaS",
+  "Windows",
+];
 
 let stripeClient = null;
 let stripeClientKey = "";
@@ -145,6 +159,90 @@ function isActiveStatus(status) {
   return ["active", "trialing"].includes(status);
 }
 
+function limitText(value, maxLength = 280) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function clampNumber(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, number));
+}
+
+function createEmptyProgress() {
+  return {
+    xp: 0,
+    solved: 0,
+    best: 0,
+    scores: [],
+    skills: Object.fromEntries(progressSkillNames.map((skill) => [skill, 0])),
+    evidence: [],
+  };
+}
+
+function sanitizeProgress(input = {}) {
+  const empty = createEmptyProgress();
+  const skills = { ...empty.skills };
+  Object.entries(input.skills || {}).slice(0, 40).forEach(([skill, value]) => {
+    const cleanSkill = limitText(skill, 40);
+    if (cleanSkill) {
+      skills[cleanSkill] = Math.round(clampNumber(value, 0, 100));
+    }
+  });
+
+  const evidence = Array.isArray(input.evidence)
+    ? input.evidence.slice(0, 20).map((entry) => ({
+        ticketId: limitText(entry?.ticketId, 24),
+        title: limitText(entry?.title, 120),
+        score: Math.round(clampNumber(entry?.score, 0, 100)),
+        summary: limitText(entry?.summary, 260),
+        interviewPrompt: limitText(entry?.interviewPrompt, 360),
+        createdAt: limitText(entry?.createdAt, 40) || new Date().toISOString(),
+      }))
+    : [];
+
+  return {
+    xp: Math.round(clampNumber(input.xp, 0, 1000000)),
+    solved: Math.round(clampNumber(input.solved, 0, 10000)),
+    best: Math.round(clampNumber(input.best, 0, 100)),
+    scores: Array.isArray(input.scores)
+      ? input.scores.slice(-20).map((score) => Math.round(clampNumber(score, 0, 100)))
+      : [],
+    skills,
+    evidence,
+  };
+}
+
+function mergeProgress(existing = {}, incoming = {}) {
+  const saved = sanitizeProgress(existing);
+  const next = sanitizeProgress(incoming);
+  const skills = { ...saved.skills };
+  Object.entries(next.skills).forEach(([skill, value]) => {
+    skills[skill] = Math.max(skills[skill] || 0, value);
+  });
+
+  const evidenceMap = new Map();
+  [...saved.evidence, ...next.evidence].forEach((entry) => {
+    const key = `${entry.ticketId}|${entry.createdAt}|${entry.score}`;
+    if (!evidenceMap.has(key)) {
+      evidenceMap.set(key, entry);
+    }
+  });
+
+  return {
+    xp: Math.max(saved.xp, next.xp),
+    solved: Math.max(saved.solved, next.solved),
+    best: Math.max(saved.best, next.best),
+    scores: [...saved.scores, ...next.scores].slice(-20),
+    skills,
+    evidence: Array.from(evidenceMap.values())
+      .sort((first, second) => String(second.createdAt).localeCompare(String(first.createdAt)))
+      .slice(0, 20),
+  };
+}
+
 async function saveCustomerSubscription({ customerId, email, subscriptionId, status, source }) {
   const store = await readStore();
   const normalizedEmail = normalizeEmail(email);
@@ -199,9 +297,32 @@ async function saveProfile(email) {
   const existing = store.profiles[normalizedEmail] || {};
   const now = new Date().toISOString();
   const profile = {
+    ...existing,
     email: normalizedEmail,
     createdAt: existing.createdAt || now,
     lastSeenAt: now,
+    progress: sanitizeProgress(existing.progress || {}),
+    progressUpdatedAt: existing.progressUpdatedAt || null,
+  };
+
+  store.profiles[normalizedEmail] = profile;
+  await writeProfiles(store);
+  return profile;
+}
+
+async function saveProgress(email, incomingProgress) {
+  const normalizedEmail = normalizeEmail(email);
+  const store = await readProfiles();
+  const existing = store.profiles[normalizedEmail] || {};
+  const now = new Date().toISOString();
+  const progress = mergeProgress(existing.progress || {}, incomingProgress);
+  const profile = {
+    ...existing,
+    email: normalizedEmail,
+    createdAt: existing.createdAt || now,
+    lastSeenAt: now,
+    progress,
+    progressUpdatedAt: now,
   };
 
   store.profiles[normalizedEmail] = profile;
@@ -451,7 +572,37 @@ app.post("/api/accounts", async (request, response) => {
 
   const profile = await saveProfile(email);
   const entitlement = await getEntitlementWithStripeFallback(email);
-  response.json({ profile, entitlement });
+  response.json({ profile, entitlement, progress: profile.progress, progressUpdatedAt: profile.progressUpdatedAt });
+});
+
+app.get("/api/progress", async (request, response) => {
+  const email = normalizeEmail(request.query.email);
+  if (!email || !email.includes("@")) {
+    response.status(400).json({ error: "A valid email is required." });
+    return;
+  }
+
+  const profile = await saveProfile(email);
+  response.json({
+    email,
+    progress: profile.progress,
+    progressUpdatedAt: profile.progressUpdatedAt,
+  });
+});
+
+app.post("/api/progress", async (request, response) => {
+  const email = normalizeEmail(request.body.email);
+  if (!email || !email.includes("@")) {
+    response.status(400).json({ error: "A valid email is required." });
+    return;
+  }
+
+  const profile = await saveProgress(email, request.body.progress || {});
+  response.json({
+    email,
+    progress: profile.progress,
+    progressUpdatedAt: profile.progressUpdatedAt,
+  });
 });
 
 app.get("/api/mobile/bootstrap", async (request, response) => {
@@ -466,6 +617,8 @@ app.get("/api/mobile/bootstrap", async (request, response) => {
   response.json({
     profile,
     entitlement,
+    progress: profile.progress,
+    progressUpdatedAt: profile.progressUpdatedAt,
     serverTime: new Date().toISOString(),
     contentVersion: "ticketready-v0.1",
   });

@@ -266,6 +266,48 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
+.account-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #f8fbfa;
+}
+
+.account-strip__status,
+.account-strip__actions {
+  min-width: 0;
+}
+
+.account-strip__status {
+  display: grid;
+  gap: 4px;
+}
+
+.account-strip__label,
+.account-strip__status span:last-child {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.account-strip__status strong {
+  overflow-wrap: anywhere;
+  color: var(--teal-dark);
+}
+
+.account-strip__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.15fr 1fr 1fr;
@@ -1248,13 +1290,19 @@ a {
 
   .panel-heading,
   .ticket-topline,
-  .dashboard-hero {
+  .dashboard-hero,
+  .account-strip {
     display: grid;
+    grid-template-columns: 1fr;
   }
 
   .dashboard-status {
     width: 100%;
     text-align: left;
+  }
+
+  .account-strip__actions {
+    grid-template-columns: 1fr;
   }
 
   .mode-tabs {

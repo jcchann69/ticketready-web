@@ -1078,6 +1078,10 @@ const els = {
   pathSummaryBadge: document.querySelector("#pathSummaryBadge"),
   pathSummary: document.querySelector("#pathSummary"),
   pathGrid: document.querySelector("#pathGrid"),
+  accountForm: document.querySelector("#accountForm"),
+  accountEmailInput: document.querySelector("#accountEmailInput"),
+  accountEmailLabel: document.querySelector("#accountEmailLabel"),
+  accountSyncStatus: document.querySelector("#accountSyncStatus"),
 };
 
 let activeTicketIndex = 0;
@@ -1089,35 +1093,92 @@ let mode = "guided";
 let lastEvidenceText = "";
 let paymentsReady = false;
 let proActive = localStorage.getItem("ticketReadyProActive") === "true";
+let accountEmail = localStorage.getItem("ticketReadyLastEmail") || "";
 
 const progress = loadProgress();
 
+function getEmptyProgress() {
+  return {
+    xp: 0,
+    solved: 0,
+    best: 0,
+    scores: [],
+    skills: Object.fromEntries(skillNames.map((skill) => [skill, 0])),
+    evidence: [],
+  };
+}
+
+function normalizeProgressRecord(saved = {}) {
+  const empty = getEmptyProgress();
+  return {
+    xp: Number(saved.xp || 0),
+    solved: Number(saved.solved || 0),
+    best: Number(saved.best || 0),
+    scores: Array.isArray(saved.scores) ? saved.scores.slice(-20).map((score) => Number(score || 0)) : [],
+    skills: { ...empty.skills, ...(saved.skills || {}) },
+    evidence: Array.isArray(saved.evidence) ? saved.evidence.slice(0, 20) : [],
+  };
+}
+
 function loadProgress() {
-  const emptySkills = Object.fromEntries(skillNames.map((skill) => [skill, 0]));
   try {
     const saved = JSON.parse(localStorage.getItem("ticketReadyProgress") || "{}");
-    return {
-      xp: Number(saved.xp || 0),
-      solved: Number(saved.solved || 0),
-      best: Number(saved.best || 0),
-      scores: Array.isArray(saved.scores) ? saved.scores.slice(-20) : [],
-      skills: { ...emptySkills, ...(saved.skills || {}) },
-      evidence: Array.isArray(saved.evidence) ? saved.evidence.slice(0, 20) : [],
-    };
+    return normalizeProgressRecord(saved);
   } catch {
-    return {
-      xp: 0,
-      solved: 0,
-      best: 0,
-      scores: [],
-      skills: emptySkills,
-      evidence: [],
-    };
+    return getEmptyProgress();
   }
 }
 
 function saveProgress() {
   localStorage.setItem("ticketReadyProgress", JSON.stringify(progress));
+}
+
+function mergeProgressRecords(localProgress, remoteProgress) {
+  const localRecord = normalizeProgressRecord(localProgress);
+  const remoteRecord = normalizeProgressRecord(remoteProgress);
+  const skills = { ...localRecord.skills };
+  Object.entries(remoteRecord.skills).forEach(([skill, value]) => {
+    skills[skill] = Math.max(Number(skills[skill] || 0), Number(value || 0));
+  });
+
+  const evidenceMap = new Map();
+  [...localRecord.evidence, ...remoteRecord.evidence].forEach((entry) => {
+    const key = `${entry.ticketId}|${entry.createdAt}|${entry.score}`;
+    if (!evidenceMap.has(key)) {
+      evidenceMap.set(key, entry);
+    }
+  });
+
+  return {
+    xp: Math.max(localRecord.xp, remoteRecord.xp),
+    solved: Math.max(localRecord.solved, remoteRecord.solved),
+    best: Math.max(localRecord.best, remoteRecord.best),
+    scores: [...remoteRecord.scores, ...localRecord.scores].slice(-20),
+    skills,
+    evidence: Array.from(evidenceMap.values())
+      .sort((first, second) => String(second.createdAt).localeCompare(String(first.createdAt)))
+      .slice(0, 20),
+  };
+}
+
+function applyProgress(nextProgress) {
+  const cleanProgress = normalizeProgressRecord(nextProgress);
+  progress.xp = cleanProgress.xp;
+  progress.solved = cleanProgress.solved;
+  progress.best = cleanProgress.best;
+  progress.scores = cleanProgress.scores;
+  progress.skills = cleanProgress.skills;
+  progress.evidence = cleanProgress.evidence;
+  saveProgress();
+}
+
+function renderAccountSync(message) {
+  const email = accountEmail || localStorage.getItem("ticketReadyLastEmail") || "";
+  els.accountEmailLabel.textContent = email || "Guest progress";
+  if (email && !els.accountEmailInput.value) {
+    els.accountEmailInput.value = email;
+  }
+  els.accountSyncStatus.textContent = message || (email ? "Progress synced to account" : "Saved on this device");
 }
 
 function calculateReadiness() {
@@ -1525,6 +1586,10 @@ function renderProState(email = localStorage.getItem("ticketReadyLastEmail") || 
     els.emailInput.value = email;
   }
 
+  if (email) {
+    accountEmail = email;
+  }
+  renderAccountSync();
   renderProDashboard();
 }
 
@@ -1532,12 +1597,88 @@ function setProState(entitlement, email) {
   proActive = Boolean(entitlement?.active);
   localStorage.setItem("ticketReadyProActive", String(proActive));
   if (email) {
+    accountEmail = email;
     localStorage.setItem("ticketReadyLastEmail", email);
   }
   if (!getAvailableTicketIndexes().includes(activeTicketIndex)) {
     loadTicket(getAvailableTicketIndexes()[0] || 0);
   }
   renderProState(email);
+}
+
+async function syncProgressToAccount(statusText = "Saving progress to account...") {
+  const email = accountEmail || localStorage.getItem("ticketReadyLastEmail") || "";
+  if (!email || !email.includes("@")) {
+    renderAccountSync("Saved on this device");
+    return null;
+  }
+
+  renderAccountSync(statusText);
+  try {
+    const response = await fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, progress }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Progress sync failed.");
+    }
+    applyProgress(mergeProgressRecords(progress, payload.progress));
+    renderStats();
+    renderQueue();
+    renderAccountSync("Progress synced to account");
+    return payload;
+  } catch (error) {
+    renderAccountSync("Saved on this device");
+    return null;
+  }
+}
+
+async function syncAccount(email, options = {}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    throw new Error("Enter a valid email to sync.");
+  }
+
+  accountEmail = normalizedEmail;
+  localStorage.setItem("ticketReadyLastEmail", normalizedEmail);
+  els.emailInput.value = normalizedEmail;
+  els.accountEmailInput.value = normalizedEmail;
+
+  if (!options.silent) {
+    renderAccountSync("Checking account...");
+  }
+
+  const response = await fetch("/api/accounts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: normalizedEmail }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Account sync failed.");
+  }
+
+  if (payload.progress) {
+    applyProgress(mergeProgressRecords(progress, payload.progress));
+  }
+  setProState(payload.entitlement, normalizedEmail);
+  await syncProgressToAccount(options.silent ? "Syncing progress..." : "Saving merged progress...");
+  renderAccountSync(payload.entitlement?.active ? "Pro account synced" : "Free account synced");
+  return payload;
+}
+
+async function handleAccountSync(event) {
+  event.preventDefault();
+  const email = els.accountEmailInput.value.trim() || els.emailInput.value.trim();
+  try {
+    await syncAccount(email);
+    els.waitlistStatus.textContent = `Training account synced for ${accountEmail}.`;
+  } catch (error) {
+    renderAccountSync(error.message);
+    els.waitlistStatus.textContent = error.message;
+  }
 }
 
 function evaluateTicket(ticket) {
@@ -1645,6 +1786,7 @@ function submitTicket() {
   });
   progress.evidence = progress.evidence.slice(0, 20);
   saveProgress();
+  syncProgressToAccount();
 
   els.scoreValue.textContent = result.score;
   els.resultTitle.textContent = result.score >= 80 ? "Job-ready resolution" : result.score >= 55 ? "Good instincts, clean it up" : "Retry this workflow";
@@ -1785,6 +1927,7 @@ async function confirmCheckoutSession(sessionId) {
 
     const email = entitlement.email || localStorage.getItem("ticketReadyLastEmail") || "";
     setProState(entitlement, email);
+    await syncProgressToAccount("Saving progress to Pro account...");
     els.waitlistStatus.textContent = entitlement.active
       ? "Pro is active. Your Job Evidence Lab and interview drills are unlocked."
       : `Checkout confirmed. Subscription status: ${entitlement.status}.`;
@@ -1808,6 +1951,14 @@ async function handleWaitlist(event) {
   }
   localStorage.setItem("ticketReadyWaitlist", JSON.stringify(saved));
   localStorage.setItem("ticketReadyLastEmail", email);
+  accountEmail = email;
+  renderAccountSync("Preparing account...");
+
+  try {
+    await syncAccount(email, { silent: true });
+  } catch {
+    renderAccountSync("Saved on this device");
+  }
 
   if (!paymentsReady) {
     els.waitlistStatus.textContent = "Email saved locally. Add Stripe keys to .env, then restart the server to enable checkout.";
@@ -1859,6 +2010,7 @@ async function checkProStatus() {
     }
 
     setProState(entitlement, email);
+    await syncAccount(email, { silent: true });
     els.waitlistStatus.textContent = entitlement.active
       ? `Pro is active for ${email}.`
       : `No active Pro subscription found for ${email}. Status: ${entitlement.status}.`;
@@ -1869,19 +2021,15 @@ async function checkProStatus() {
 
 async function checkStoredProStatus() {
   const email = localStorage.getItem("ticketReadyLastEmail");
-  if (!email || !paymentsReady) {
+  if (!email) {
     renderProState(email || "");
     return;
   }
 
   try {
-    const response = await fetch(`/api/entitlements?email=${encodeURIComponent(email)}`);
-    const entitlement = await response.json();
-    if (response.ok) {
-      setProState(entitlement, email);
-      if (entitlement.active) {
-        els.waitlistStatus.textContent = "Pro is active on this device.";
-      }
+    const account = await syncAccount(email, { silent: true });
+    if (account?.entitlement?.active) {
+      els.waitlistStatus.textContent = "Pro is active on this device.";
     }
   } catch {
     renderProState(email);
@@ -1918,6 +2066,7 @@ function bindEvents() {
   els.randomTicketBtn.addEventListener("click", chooseRandomTicket);
   els.copyClipBtn.addEventListener("click", copyCreatorScript);
   els.copyEvidenceBtn.addEventListener("click", copyEvidence);
+  els.accountForm.addEventListener("submit", handleAccountSync);
   els.waitlistForm.addEventListener("submit", handleWaitlist);
   els.checkProBtn.addEventListener("click", checkProStatus);
   els.manageBillingBtn.addEventListener("click", manageBilling);

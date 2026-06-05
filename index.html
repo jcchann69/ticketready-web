@@ -41,6 +41,18 @@
           </div>
         </div>
 
+        <form class="account-strip" id="accountForm">
+          <div class="account-strip__status">
+            <span class="account-strip__label">Training Account</span>
+            <strong id="accountEmailLabel">Guest progress</strong>
+            <span id="accountSyncStatus" aria-live="polite">Saved on this device</span>
+          </div>
+          <div class="account-strip__actions">
+            <input id="accountEmailInput" name="accountEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+            <button class="button button--secondary" type="submit">Sync</button>
+          </div>
+        </form>
+
         <div class="dashboard-grid">
           <article class="dashboard-card dashboard-card--plan">
             <div class="pane-title">
