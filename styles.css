@@ -187,6 +187,11 @@ select:focus-visible {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .full-width {
   width: 100%;
 }
@@ -324,6 +329,75 @@ select:focus-visible {
 
 .dashboard-card--plan {
   background: #fbfdfc;
+}
+
+.weekly-report-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: #ffffff;
+}
+
+.weekly-report-panel.is-pro-active {
+  border-color: rgba(47, 143, 91, 0.44);
+  background: #fbfffd;
+}
+
+.weekly-report-panel.is-locked {
+  background: #fffaf0;
+}
+
+.weekly-report__title {
+  align-items: flex-start;
+}
+
+.weekly-report__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.weekly-report-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.weekly-report-card {
+  min-width: 0;
+  min-height: 132px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fbfdfc;
+}
+
+.weekly-report-card__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.weekly-report-card strong {
+  display: block;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+  color: var(--teal-dark);
+  font-size: 1rem;
+  line-height: 1.22;
+}
+
+.weekly-report-card p {
+  margin-bottom: 0;
+  color: #334441;
+  font-size: 0.84rem;
+  line-height: 1.38;
 }
 
 .today-plan {
@@ -1206,6 +1280,10 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
+  .weekly-report-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .path-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1227,7 +1305,8 @@ a {
   .sim-grid,
   .workspace-grid,
   .outcome-grid,
-  .dashboard-grid {
+  .dashboard-grid,
+  .weekly-report-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1303,6 +1382,10 @@ a {
 
   .account-strip__actions {
     grid-template-columns: 1fr;
+  }
+
+  .weekly-report__actions {
+    justify-content: flex-start;
   }
 
   .mode-tabs {

@@ -1082,6 +1082,11 @@ const els = {
   accountEmailInput: document.querySelector("#accountEmailInput"),
   accountEmailLabel: document.querySelector("#accountEmailLabel"),
   accountSyncStatus: document.querySelector("#accountSyncStatus"),
+  weeklyReportPanel: document.querySelector("#weeklyReportPanel"),
+  weeklyReportBadge: document.querySelector("#weeklyReportBadge"),
+  weeklyReportBody: document.querySelector("#weeklyReportBody"),
+  weeklyReportStatus: document.querySelector("#weeklyReportStatus"),
+  copyWeeklyReportBtn: document.querySelector("#copyWeeklyReportBtn"),
 };
 
 let activeTicketIndex = 0;
@@ -1094,6 +1099,7 @@ let lastEvidenceText = "";
 let paymentsReady = false;
 let proActive = localStorage.getItem("ticketReadyProActive") === "true";
 let accountEmail = localStorage.getItem("ticketReadyLastEmail") || "";
+let weeklyReportText = "";
 
 const progress = loadProgress();
 
@@ -1545,6 +1551,126 @@ function renderEvidenceVault() {
   });
 }
 
+function getWeeklyEvidence() {
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const recent = progress.evidence.filter((entry) => {
+    const created = Date.parse(entry.createdAt);
+    return Number.isFinite(created) && now - created <= weekMs;
+  });
+
+  return recent.length ? recent : progress.evidence.slice(0, 5);
+}
+
+function getSkillSummary() {
+  const practicedSkills = Object.entries(progress.skills).filter(([, value]) => Number(value) > 0);
+  const strongSkills = practicedSkills
+    .slice()
+    .sort((first, second) => second[1] - first[1])
+    .slice(0, 3)
+    .map(([skill]) => skill);
+  const weakSkills = Object.entries(progress.skills)
+    .slice()
+    .sort((first, second) => first[1] - second[1])
+    .slice(0, 3)
+    .map(([skill]) => skill);
+
+  return {
+    strongSkills: strongSkills.length ? strongSkills : ["Triage"],
+    weakSkills,
+  };
+}
+
+function getWeekRangeLabel() {
+  const start = new Date();
+  start.setDate(start.getDate() - 6);
+  const end = new Date();
+  const options = { month: "short", day: "numeric" };
+  return `${start.toLocaleDateString(undefined, options)} - ${end.toLocaleDateString(undefined, options)}`;
+}
+
+function createReportCard(label, value, detail) {
+  const card = document.createElement("article");
+  card.className = "weekly-report-card";
+  card.append(createTextElement("span", label, "weekly-report-card__label"));
+  card.append(createTextElement("strong", value));
+  card.append(createTextElement("p", detail));
+  return card;
+}
+
+function buildWeeklyReport() {
+  const evidence = getWeeklyEvidence();
+  const readiness = calculateReadiness();
+  const averageScore = evidence.length
+    ? Math.round(evidence.reduce((sum, entry) => sum + Number(entry.score || 0), 0) / evidence.length)
+    : 0;
+  const strongestEvidence = evidence.slice().sort((first, second) => Number(second.score || 0) - Number(first.score || 0))[0];
+  const { strongSkills, weakSkills } = getSkillSummary();
+  const nextFocus = weakSkills[0] || getWeakestSkill();
+  const interviewPrompt =
+    strongestEvidence?.interviewPrompt ||
+    `Explain how you would triage ${tickets[activeTicketIndex].title}, choose priority, and document the resolution.`;
+
+  return {
+    evidence,
+    readiness,
+    averageScore,
+    strongestEvidence,
+    strongSkills,
+    weakSkills,
+    nextFocus,
+    interviewPrompt,
+    text: [
+      `TicketReady Weekly Readiness Report`,
+      `Week: ${getWeekRangeLabel()}`,
+      `Tickets completed: ${evidence.length}`,
+      `Readiness: ${readiness}%`,
+      `Average score: ${averageScore || "No scored tickets yet"}`,
+      `Strongest evidence: ${strongestEvidence ? `${strongestEvidence.ticketId} - ${strongestEvidence.title} (${strongestEvidence.score}/100)` : "Complete a scored ticket to create evidence."}`,
+      `Strong skills: ${strongSkills.join(", ")}`,
+      `Next focus: ${nextFocus}`,
+      `Interview drill: ${interviewPrompt}`,
+    ].join("\n"),
+  };
+}
+
+function renderWeeklyReport() {
+  els.weeklyReportBody.replaceChildren();
+  els.weeklyReportPanel.classList.toggle("is-pro-active", proActive);
+  els.weeklyReportPanel.classList.toggle("is-locked", !proActive);
+
+  if (!proActive) {
+    weeklyReportText = "";
+    els.weeklyReportBadge.textContent = "Locked";
+    els.copyWeeklyReportBtn.disabled = true;
+    els.weeklyReportBody.append(
+      createReportCard("Weekly summary", "Pro", "Unlock the report that turns scored tickets into job-readiness proof."),
+      createReportCard("Evidence", "Saved", "See your strongest cases, score trend, and reusable interview prompt."),
+      createReportCard("Next focus", "Guided", "The app points you toward weak skills for the next shift.")
+    );
+    els.weeklyReportStatus.textContent = "Subscribe to unlock weekly summaries built from your completed tickets.";
+    return;
+  }
+
+  const report = buildWeeklyReport();
+  weeklyReportText = report.text;
+  els.weeklyReportBadge.textContent = report.evidence.length ? `${report.evidence.length} tickets` : "Ready";
+  els.copyWeeklyReportBtn.disabled = !report.evidence.length;
+  els.weeklyReportBody.append(
+    createReportCard("Week", getWeekRangeLabel(), `${report.evidence.length} scored tickets included in this summary.`),
+    createReportCard("Average Score", report.averageScore ? `${report.averageScore}/100` : "Start", `${report.readiness}% overall readiness.`),
+    createReportCard(
+      "Strongest Evidence",
+      report.strongestEvidence ? `${report.strongestEvidence.ticketId}` : "None yet",
+      report.strongestEvidence ? report.strongestEvidence.summary : "Complete a scored ticket to create proof."
+    ),
+    createReportCard("Next Focus", report.nextFocus, `Rehearse this skill, then complete two related tickets.`)
+  );
+  els.weeklyReportStatus.textContent = report.evidence.length
+    ? "Weekly report ready to copy for job-search notes and interview prep."
+    : "Finish a scored ticket to generate your first weekly report.";
+}
+
 function renderProDashboard() {
   const readiness = calculateReadiness();
   const rampDay = Math.min(30, Math.max(1, progress.solved + 1));
@@ -1570,6 +1696,7 @@ function renderProDashboard() {
 
   renderTodayPlan();
   renderEvidenceVault();
+  renderWeeklyReport();
   renderTrainingPath();
 }
 
@@ -1873,6 +2000,32 @@ function copyEvidence() {
   }
 }
 
+function copyWeeklyReport() {
+  const fallback = weeklyReportText || "Complete a Pro ticket first to create a weekly readiness report.";
+
+  if (!weeklyReportText) {
+    els.weeklyReportStatus.textContent = fallback;
+    return;
+  }
+
+  if (navigator.clipboard) {
+    navigator.clipboard
+      .writeText(fallback)
+      .then(() => {
+        els.copyWeeklyReportBtn.textContent = "Copied";
+        els.weeklyReportStatus.textContent = "Weekly report copied.";
+        setTimeout(() => {
+          els.copyWeeklyReportBtn.textContent = "Copy Report";
+        }, 1600);
+      })
+      .catch(() => {
+        els.weeklyReportStatus.textContent = fallback;
+      });
+  } else {
+    els.weeklyReportStatus.textContent = fallback;
+  }
+}
+
 async function loadPaymentConfig() {
   try {
     const response = await fetch("/api/config");
@@ -2066,6 +2219,7 @@ function bindEvents() {
   els.randomTicketBtn.addEventListener("click", chooseRandomTicket);
   els.copyClipBtn.addEventListener("click", copyCreatorScript);
   els.copyEvidenceBtn.addEventListener("click", copyEvidence);
+  els.copyWeeklyReportBtn.addEventListener("click", copyWeeklyReport);
   els.accountForm.addEventListener("submit", handleAccountSync);
   els.waitlistForm.addEventListener("submit", handleWaitlist);
   els.checkProBtn.addEventListener("click", checkProStatus);
