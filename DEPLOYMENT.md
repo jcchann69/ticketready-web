@@ -63,6 +63,7 @@ SITE_URL=https://www.ticketready.net
 DATABASE_PATH=/var/data/ticketready.sqlite
 SESSION_SECRET=long_random_secret
 RESEND_API_KEY=re_...
+BREVO_API_KEY=xkeysib_...
 SENDGRID_API_KEY=SG_...
 LOGIN_EMAIL_FROM=TicketReady <login@ticketready.net>
 STRIPE_SECRET_KEY=sk_test_... first, sk_live_... later
@@ -73,9 +74,9 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 Start with Stripe test keys even on the deployed domain. Switch to live keys only after the deployed test checkout works.
 
-For local development, TicketReady can show a test login code on localhost. For production, configure `LOGIN_EMAIL_FROM` plus either `RESEND_API_KEY` or `SENDGRID_API_KEY` before real users need to sign in.
+For local development, TicketReady can show a test login code on localhost. For production, configure `LOGIN_EMAIL_FROM` plus `BREVO_API_KEY`, `RESEND_API_KEY`, or `SENDGRID_API_KEY` before real users need to sign in.
 
-If your DNS is managed by Wix, prefer SendGrid for now. Resend asks for a subdomain MX record that Wix does not support, while SendGrid's automated security setup uses CNAME records that Wix can add.
+If your DNS is managed by Wix and one provider blocks setup, use Brevo next. Brevo's manual domain authentication uses normal TXT/CNAME-style records that are easier to add in Wix than Resend's subdomain MX return-path record.
 
 ## Domain Setup
 

@@ -944,6 +944,34 @@ async function sendResendLoginCode(apiKey, from, email, code) {
   return { delivery: "email", provider: "resend" };
 }
 
+async function sendBrevoLoginCode(apiKey, from, email, code) {
+  const sender = parseSenderAddress(from);
+  if (!sender.email) {
+    throw new Error("LOGIN_EMAIL_FROM is missing.");
+  }
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender,
+      to: [{ email }],
+      subject: getLoginEmailSubject(),
+      htmlContent: getLoginEmailHtml(code),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not send login code with Brevo.");
+  }
+
+  return { delivery: "email", provider: "brevo" };
+}
+
 async function sendSendGridLoginCode(apiKey, from, email, code) {
   const sender = parseSenderAddress(from);
   if (!sender.email) {
@@ -980,12 +1008,17 @@ async function sendSendGridLoginCode(apiKey, from, email, code) {
 
 async function sendLoginCode(email, code, request) {
   const resendApiKey = process.env.RESEND_API_KEY || "";
+  const brevoApiKey = process.env.BREVO_API_KEY || "";
   const sendGridApiKey = process.env.SENDGRID_API_KEY || "";
   const from = process.env.LOGIN_EMAIL_FROM || "";
   const allowDevCode = isLocalRequest(request) || process.env.AUTH_DEV_CODES === "true";
 
   if (resendApiKey && from) {
     return sendResendLoginCode(resendApiKey, from, email, code);
+  }
+
+  if (brevoApiKey && from) {
+    return sendBrevoLoginCode(brevoApiKey, from, email, code);
   }
 
   if (sendGridApiKey && from) {
@@ -996,7 +1029,7 @@ async function sendLoginCode(email, code, request) {
     return { delivery: "dev", devCode: code };
   }
 
-  throw new Error("Email login is not configured yet. Add RESEND_API_KEY or SENDGRID_API_KEY in Render.");
+  throw new Error("Email login is not configured yet. Add BREVO_API_KEY, RESEND_API_KEY, or SENDGRID_API_KEY in Render.");
 }
 
 async function syncSubscriptionFromStripe(email) {
