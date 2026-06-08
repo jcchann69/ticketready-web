@@ -524,6 +524,142 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.momentum-panel {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.55fr) minmax(230px, 0.48fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #ffffff;
+}
+
+.momentum-panel.is-pro-active {
+  border-color: rgba(47, 143, 91, 0.4);
+  background: #fbfffd;
+}
+
+.momentum-panel.is-complete {
+  border-color: rgba(47, 143, 91, 0.58);
+  background: #f2fbf5;
+}
+
+.momentum-summary {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.momentum-summary h3 {
+  margin-bottom: 0;
+  color: var(--ink);
+  font-size: 1.04rem;
+  line-height: 1.2;
+}
+
+.momentum-summary p {
+  margin-bottom: 0;
+  color: #334441;
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+
+.momentum-meter-card {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(11, 124, 119, 0.2);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: #f8fbfa;
+}
+
+.momentum-meter-card__top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.momentum-meter-card__top strong {
+  color: var(--teal-dark);
+  font-size: 0.94rem;
+}
+
+.momentum-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.momentum-action {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px;
+  background: #fbfdfc;
+}
+
+.momentum-action.is-complete {
+  border-color: rgba(47, 143, 91, 0.42);
+  background: #f4fbf6;
+}
+
+.momentum-action.is-locked {
+  background: #fffaf0;
+}
+
+.momentum-action__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #b8cac5;
+  border-radius: 999px;
+  color: var(--teal-dark);
+  background: #f3f7f6;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.momentum-action.is-complete .momentum-action__mark {
+  border-color: rgba(47, 143, 91, 0.62);
+  color: #ffffff;
+  background: var(--green);
+}
+
+.momentum-action__body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.momentum-action__body strong {
+  color: var(--ink);
+  font-size: 0.8rem;
+  line-height: 1.24;
+}
+
+.momentum-action__body span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.32;
+}
+
+.momentum-panel .button {
+  align-self: center;
+  white-space: nowrap;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.15fr repeat(3, minmax(0, 1fr));
@@ -1953,8 +2089,16 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .momentum-panel {
+    grid-template-columns: 1fr;
+  }
+
   .mission-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .momentum-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .drill-coach-layout {
@@ -1966,6 +2110,10 @@ a {
   }
 
   .start-mission .button {
+    justify-self: flex-start;
+  }
+
+  .momentum-panel .button {
     justify-self: flex-start;
   }
 
@@ -2013,6 +2161,7 @@ a {
   .dashboard-grid,
   .career-goal-options,
   .mission-steps,
+  .momentum-actions,
   .drill-recommendations,
   .weekly-report-grid,
   .proof-pack-grid,
@@ -2023,6 +2172,10 @@ a {
 
   .dashboard-card--plan {
     grid-column: auto;
+  }
+
+  .momentum-panel {
+    grid-template-columns: 1fr;
   }
 
   .drill-coach-layout {
@@ -2091,6 +2244,7 @@ a {
   .dashboard-hero,
   .career-goal-strip,
   .start-mission,
+  .momentum-panel,
   .account-strip {
     display: grid;
     grid-template-columns: 1fr;

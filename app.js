@@ -1106,6 +1106,14 @@ const els = {
   startMissionCopy: document.querySelector("#startMissionCopy"),
   missionSteps: document.querySelector("#missionSteps"),
   missionCtaBtn: document.querySelector("#missionCtaBtn"),
+  momentumPanel: document.querySelector("#momentumPanel"),
+  momentumCopy: document.querySelector("#momentumCopy"),
+  momentumBadge: document.querySelector("#momentumBadge"),
+  momentumStreak: document.querySelector("#momentumStreak"),
+  momentumFill: document.querySelector("#momentumFill"),
+  momentumToday: document.querySelector("#momentumToday"),
+  momentumActions: document.querySelector("#momentumActions"),
+  momentumBtn: document.querySelector("#momentumBtn"),
   rampDayBadge: document.querySelector("#rampDayBadge"),
   todayPlan: document.querySelector("#todayPlan"),
   dashboardPrimaryBtn: document.querySelector("#dashboardPrimaryBtn"),
@@ -1450,6 +1458,50 @@ function getRecommendedTicketIndex() {
   return getQueueTicketIndexes()[0] ?? activeTicketIndex;
 }
 
+function getDateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getShiftedDateKey(daysAgo) {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return getDateKey(date);
+}
+
+function getPracticeDateKeys() {
+  return new Set(
+    [...progress.evidence, ...progress.interviews]
+      .map((entry) => getDateKey(entry.createdAt))
+      .filter(Boolean)
+  );
+}
+
+function getCurrentPracticeStreak() {
+  const practicedDates = getPracticeDateKeys();
+  let streak = 0;
+  while (practicedDates.has(getShiftedDateKey(streak))) {
+    streak += 1;
+  }
+  return streak;
+}
+
+function getTodayPracticeCounts() {
+  const todayKey = getDateKey();
+  return {
+    tickets: progress.evidence.filter((entry) => getDateKey(entry.createdAt) === todayKey).length,
+    interviews: progress.interviews.filter((entry) => getDateKey(entry.createdAt) === todayKey).length,
+    activeDays: getPracticeDateKeys().size,
+  };
+}
+
 function getFirstSessionSteps(recommendedTicket) {
   const careerGoal = getCareerGoalProfile(progress.careerGoal);
   return [
@@ -1519,6 +1571,71 @@ function renderStartMission() {
     els.missionCtaBtn.textContent = "Open Proof Pack";
     els.missionCtaBtn.dataset.missionTarget = "proof";
   }
+}
+
+function getMomentumActions() {
+  const counts = getTodayPracticeCounts();
+  const ticketGoal = proActive ? 2 : 1;
+  return [
+    {
+      label: `Complete ${ticketGoal} ticket${ticketGoal === 1 ? "" : "s"}`,
+      detail: `${Math.min(counts.tickets, ticketGoal)}/${ticketGoal} today`,
+      complete: counts.tickets >= ticketGoal,
+      target: "ticket",
+    },
+    {
+      label: "Save proof evidence",
+      detail: counts.tickets ? "Evidence created from today's scored ticket." : "Score a ticket to create today's proof.",
+      complete: counts.tickets >= 1,
+      target: "ticket",
+    },
+    {
+      label: "Practice interview answer",
+      detail: proActive ? `${counts.interviews}/1 today` : "Pro unlocks scored answer practice.",
+      complete: counts.interviews >= 1,
+      locked: !proActive,
+      target: proActive ? "interview" : "subscribe",
+    },
+  ];
+}
+
+function renderMomentumTracker() {
+  const counts = getTodayPracticeCounts();
+  const actions = getMomentumActions();
+  const completed = actions.filter((action) => action.complete).length;
+  const nextAction = actions.find((action) => !action.complete) || actions[actions.length - 1];
+  const streak = getCurrentPracticeStreak();
+  const goalPercent = Math.round((completed / actions.length) * 100);
+
+  els.momentumPanel.classList.toggle("is-complete", completed === actions.length);
+  els.momentumPanel.classList.toggle("is-pro-active", proActive);
+  els.momentumBadge.textContent = proActive ? `${counts.activeDays} active days` : "Daily Preview";
+  els.momentumStreak.textContent = streak ? `${streak} day${streak === 1 ? "" : "s"} streak` : "No streak yet";
+  els.momentumFill.style.width = `${goalPercent}%`;
+  els.momentumToday.textContent = `${completed} of ${actions.length} daily actions complete.`;
+  els.momentumCopy.textContent = nextAction.complete
+    ? "Daily goal complete. Keep your proof fresh or come back tomorrow for another shift."
+    : `Next: ${nextAction.label}. Small daily reps keep your job-readiness proof moving.`;
+  els.momentumActions.replaceChildren();
+
+  actions.forEach((action, index) => {
+    const item = document.createElement("div");
+    item.className = [
+      "momentum-action",
+      action.complete ? "is-complete" : "",
+      action.locked && !action.complete ? "is-locked" : "",
+    ].filter(Boolean).join(" ");
+    item.append(createTextElement("span", action.complete ? "OK" : String(index + 1), "momentum-action__mark"));
+    const body = document.createElement("div");
+    body.className = "momentum-action__body";
+    body.append(createTextElement("strong", action.label));
+    body.append(createTextElement("span", action.detail));
+    item.append(body);
+    els.momentumActions.append(item);
+  });
+
+  els.momentumBtn.textContent = nextAction.complete ? "Open Proof Pack" : nextAction.target === "interview" ? "Practice Interview" : nextAction.target === "subscribe" ? "Unlock Pro Tools" : "Continue Today";
+  els.momentumBtn.dataset.momentumTarget = nextAction.complete ? "proof" : nextAction.target;
 }
 
 function renderStats() {
@@ -2515,6 +2632,7 @@ function renderProDashboard() {
 
   renderCareerGoalSelector();
   renderStartMission();
+  renderMomentumTracker();
   renderTodayPlan();
   renderEvidenceVault();
   renderReadinessChecklist();
@@ -2870,6 +2988,29 @@ function chooseRandomTicket() {
 
 function handleMissionCta() {
   const target = els.missionCtaBtn.dataset.missionTarget || "ticket";
+  if (target === "subscribe") {
+    document.querySelector(".subscription-panel").scrollIntoView({ behavior: "smooth", block: "center" });
+    els.emailInput.focus();
+    return;
+  }
+
+  if (target === "interview") {
+    els.interviewCoachPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+    els.mockInterviewAnswer.focus();
+    return;
+  }
+
+  if (target === "proof") {
+    els.proofExportPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  loadTicket(getRecommendedTicketIndex());
+  document.querySelector(".training-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function handleMomentumCta() {
+  const target = els.momentumBtn.dataset.momentumTarget || "ticket";
   if (target === "subscribe") {
     document.querySelector(".subscription-panel").scrollIntoView({ behavior: "smooth", block: "center" });
     els.emailInput.focus();
@@ -3338,6 +3479,7 @@ function bindEvents() {
   els.downloadProofPackBtn.addEventListener("click", downloadProofPack);
   els.copyApplicationKitBtn.addEventListener("click", copyApplicationKit);
   els.missionCtaBtn.addEventListener("click", handleMissionCta);
+  els.momentumBtn.addEventListener("click", handleMomentumCta);
   els.drillCoachBtn.addEventListener("click", handleDrillCoachClick);
   els.drillRecommendations.addEventListener("click", handleDrillCoachClick);
   els.scoreInterviewBtn.addEventListener("click", scoreInterviewAnswer);
