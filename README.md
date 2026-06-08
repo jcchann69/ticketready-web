@@ -5,7 +5,7 @@ TicketReady is a playable website prototype for a service desk training game. It
 ## What is included
 
 - Static website prototype in `index.html`
-- Six realistic ticket scenarios across access, network, security, hardware, SaaS, and Windows support
+- Thirty-nine realistic ticket scenarios across access, Active Directory, laptop provisioning, networking, printer mapping, security, hardware, SaaS, and Windows support
 - Scoring for category, priority, response tone, action choices, and dangerous shortcuts
 - Local progress tracking with XP, solved tickets, best score, skill growth, and readiness
 - Pro-style Job Evidence Lab with resume proof, interview prompts, and next-drill recommendations
@@ -28,7 +28,7 @@ TicketReady is a playable website prototype for a service desk training game. It
 The first paid version should sell outcomes, not just content.
 
 - Free tier: daily ticket, score, basic coaching
-- Pro tier: 30-day job ramp, larger ticket library, mock interview mode, resume evidence log, job-role paths, and weekly readiness reports
+- Pro tier: 30-day job ramp, entry-level IT essentials pack, mock interview mode, resume evidence log, job-role paths, and weekly readiness reports
 - Team tier: cohorts, admin dashboard, leaderboard, and hiring-prep reporting
 
 Paid users need to feel progress after every session. The most valuable loop is:

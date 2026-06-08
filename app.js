@@ -83,6 +83,34 @@ const actionCatalog = {
     label: "Ignore alert",
     detail: "Assume the user knows what happened.",
   },
+  unlock_account: {
+    label: "Unlock account",
+    detail: "Clear lockout only after identity is verified.",
+  },
+  check_ad_group: {
+    label: "Check AD group",
+    detail: "Confirm user, OU, group, and policy membership.",
+  },
+  image_laptop: {
+    label: "Image laptop",
+    detail: "Apply the approved build or Autopilot profile.",
+  },
+  enroll_device: {
+    label: "Enroll device",
+    detail: "Complete MDM enrollment and compliance checks.",
+  },
+  map_printer: {
+    label: "Map printer",
+    detail: "Add the approved queue by location or group.",
+  },
+  check_cables: {
+    label: "Check connection",
+    detail: "Confirm dock, cable, power, and device link.",
+  },
+  test_network_path: {
+    label: "Test network path",
+    detail: "Check IP, DNS, gateway, and reachability.",
+  },
 };
 
 const tickets = [
@@ -929,7 +957,121 @@ const proTicketTemplates = [
   },
 ];
 
+const entryLevelEssentialsTickets = [
+  {
+    id: "SD-2342",
+    title: "User locked out of Active Directory",
+    requester: "Angela M.",
+    role: "Customer service rep",
+    company: "Atlas Supply",
+    channel: "Phone",
+    asset: "Active Directory account",
+    slaMinutes: 35,
+    category: "Access",
+    priority: "P3",
+    customerNote: "I changed my password this morning and now my Windows login says the account is locked. I can still take calls if someone logs me into a spare workstation, but I need my own profile back.",
+    signals: ["single user", "workaround exists", "password change"],
+    kb: ["Account unlocks require requester verification.", "Check recent lockout source before resetting again.", "Confirm the user can sign in and document the lockout cause."],
+    correctActions: ["verify_identity", "check_ad_group", "unlock_account", "confirm_with_user"],
+    preferredFirst: "verify_identity",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["verify_identity", "unlock_account", "check_ad_group", "reset_password", "bypass_mfa", "confirm_with_user", "document_resolution", "close_without_confirmation"],
+    skills: ["Active Directory", "Identity", "Documentation"],
+    outcome: "Best path: verify the requester, check AD lockout details and group status, unlock or reset through the approved flow, confirm Windows sign-in, and document the cause.",
+    socialHook: "Active Directory lockout on the service desk. The fastest fix still starts with identity verification.",
+  },
+  {
+    id: "SD-2366",
+    title: "New hire laptop image missing VPN",
+    requester: "Talia N.",
+    role: "HR coordinator",
+    company: "ForgeWorks",
+    channel: "Portal",
+    asset: "Windows laptop imaging",
+    slaMinutes: 75,
+    category: "Service Request",
+    priority: "P3",
+    customerNote: "A new remote hire received their laptop today, but VPN is missing and Company Portal says setup is incomplete. Orientation is tomorrow morning.",
+    signals: ["new hire", "remote worker", "setup deadline"],
+    kb: ["Provisioning issues need asset tag, user, image profile, and enrollment status.", "Check MDM compliance before installing manually.", "Confirm the user can reach required apps before closing."],
+    correctActions: ["collect_logs", "enroll_device", "image_laptop", "confirm_with_user"],
+    preferredFirst: "collect_logs",
+    dangerousActions: ["bypass_mfa", "close_without_confirmation"],
+    actionPool: ["collect_logs", "enroll_device", "image_laptop", "assign_license", "bypass_mfa", "remote_session", "confirm_with_user", "document_resolution"],
+    skills: ["Provisioning", "Windows", "Documentation"],
+    outcome: "Best path: collect asset and enrollment details, finish the approved MDM/device setup, apply the correct image or profile, confirm VPN and required apps, then document.",
+    socialHook: "Laptop provisioning sounds boring until the new hire starts tomorrow and VPN is missing.",
+  },
+  {
+    id: "SD-2381",
+    title: "Docking station will not detect monitors",
+    requester: "Chris P.",
+    role: "Finance analyst",
+    company: "Cobalt Finance",
+    channel: "Walk-up",
+    asset: "Laptop dock and dual monitors",
+    slaMinutes: 55,
+    category: "Hardware",
+    priority: "P3",
+    customerNote: "My laptop works, but the docking station will not show either monitor. The same monitors worked yesterday and I have a spreadsheet review after lunch.",
+    signals: ["single desk", "hardware path", "meeting later"],
+    kb: ["Start with power, cable, dock firmware, and known-good port checks.", "Use a spare dock only after isolating the failing part.", "Confirm both monitors extend before closing."],
+    correctActions: ["ask_impact", "check_cables", "search_kb", "confirm_with_user"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "check_cables", "search_kb", "remote_session", "reboot_server", "assign_license", "confirm_with_user", "document_resolution"],
+    skills: ["Hardware", "Troubleshooting", "Communication"],
+    outcome: "Best path: confirm timing and workaround, check power/cables/dock behavior, use the approved dock fix or replacement path, verify both monitors, and document.",
+    socialHook: "Two monitors go dark at a finance desk. Basic hardware troubleshooting is still real IT work.",
+  },
+  {
+    id: "SD-2404",
+    title: "Printer mapping disappeared after move",
+    requester: "Mei L.",
+    role: "Office manager",
+    company: "Brightline Health",
+    channel: "Chat",
+    asset: "Network printer queue",
+    slaMinutes: 50,
+    category: "Hardware",
+    priority: "P3",
+    customerNote: "After moving to the new clinic floor, three front desk PCs no longer show the check-in printer. Other printers appear, but this one is needed for patient labels.",
+    signals: ["small group", "location change", "patient check-in"],
+    kb: ["Printer mapping often depends on location, group policy, or the assigned print queue.", "Check the approved queue before installing drivers manually.", "Print a test page or label before closing."],
+    correctActions: ["ask_impact", "map_printer", "restart_spooler", "confirm_with_user"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reboot_server", "close_without_confirmation"],
+    actionPool: ["ask_impact", "map_printer", "restart_spooler", "check_ad_group", "reboot_server", "assign_license", "confirm_with_user", "document_resolution"],
+    skills: ["Printers", "Hardware", "Windows"],
+    outcome: "Best path: confirm affected PCs and patient impact, map the approved printer queue or group policy, clear spooler issues if needed, print a test label, and document.",
+    socialHook: "Printer mapping after an office move: the kind of help desk ticket people actually get on day one.",
+  },
+  {
+    id: "SD-2429",
+    title: "Desk move broke network access",
+    requester: "Jorge A.",
+    role: "Operations planner",
+    company: "Northstar Foods",
+    channel: "Teams",
+    asset: "Ethernet and Wi-Fi",
+    slaMinutes: 40,
+    category: "Network",
+    priority: "P3",
+    customerNote: "I moved to a new desk and now Ethernet says no internet. Wi-Fi works, but the warehouse planning app is much faster on the wired connection.",
+    signals: ["single user", "desk move", "wired network clue"],
+    kb: ["Desk-move network tickets need port, cable, IP, VLAN, and known-good device checks.", "Wi-Fi workaround usually lowers urgency.", "Escalate to network with jack number and test results if the port is inactive."],
+    correctActions: ["ask_impact", "check_cables", "test_network_path", "escalate_network"],
+    preferredFirst: "ask_impact",
+    dangerousActions: ["reset_password", "close_without_confirmation"],
+    actionPool: ["ask_impact", "check_cables", "test_network_path", "check_status", "escalate_network", "reset_password", "document_resolution", "close_without_confirmation"],
+    skills: ["Network", "Troubleshooting", "Escalation"],
+    outcome: "Best path: confirm workaround and impact, check cable/port basics, test IP and reachability, then escalate with jack number and results if the wired port is inactive.",
+    socialHook: "A desk move breaks Ethernet but Wi-Fi works. This is basic networking troubleshooting in real life.",
+  },
+];
+
 tickets.push(...proTicketTemplates);
+tickets.push(...entryLevelEssentialsTickets);
 
 const skillNames = [
   "Identity",
@@ -944,28 +1086,31 @@ const skillNames = [
   "Access",
   "SaaS",
   "Windows",
+  "Active Directory",
+  "Provisioning",
+  "Printers",
 ];
 
 const careerGoalProfiles = {
   help_desk: {
     label: "Help Desk Analyst",
     shortLabel: "Help Desk",
-    skills: ["SLA", "Documentation", "Communication", "Identity"],
-    plan: "Prioritize clear triage, SLA judgment, safe identity checks, and clean ticket notes.",
+    skills: ["SLA", "Documentation", "Communication", "Active Directory"],
+    plan: "Prioritize clear triage, SLA judgment, account support, and clean ticket notes.",
     proof: "help desk readiness",
   },
   it_support: {
     label: "IT Support Specialist",
     shortLabel: "IT Support",
-    skills: ["Troubleshooting", "Access", "SaaS", "Windows"],
-    plan: "Prioritize practical troubleshooting, SaaS access, Windows issues, and user confirmation.",
+    skills: ["Troubleshooting", "Active Directory", "Windows", "Network"],
+    plan: "Prioritize AD account support, practical troubleshooting, Windows issues, and user confirmation.",
     proof: "IT support readiness",
   },
   desktop_support: {
     label: "Desktop Support",
     shortLabel: "Desktop",
-    skills: ["Hardware", "Windows", "Troubleshooting", "Communication"],
-    plan: "Prioritize device intake, Windows evidence, user communication, and verified fixes.",
+    skills: ["Hardware", "Provisioning", "Printers", "Windows"],
+    plan: "Prioritize device intake, imaging/provisioning, printer setup, and verified fixes.",
     proof: "desktop support readiness",
   },
   security_support: {
@@ -1657,7 +1802,9 @@ function renderStats() {
 
 function renderSkills() {
   els.skillGrid.replaceChildren();
-  skillNames.slice(0, 8).forEach((skill) => {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  const visibleSkills = Array.from(new Set([...careerGoal.skills, ...skillNames])).slice(0, 8);
+  visibleSkills.forEach((skill) => {
     const value = Math.min(100, Math.round(progress.skills[skill] || 0));
     const item = document.createElement("div");
     item.className = "skill";
@@ -1745,8 +1892,8 @@ function renderQueue() {
   if (!proActive) {
     const locked = document.createElement("div");
     locked.className = "ticket-row ticket-row--locked";
-    locked.append(createTextElement("span", "Pro unlocks 28 more realistic tickets", "ticket-row__title"));
-    locked.append(createTextElement("span", "VPN, phishing, Windows, SaaS, access, hardware, and escalation cases."));
+    locked.append(createTextElement("span", `Pro unlocks ${tickets.length - FREE_TICKET_LIMIT} more realistic tickets`, "ticket-row__title"));
+    locked.append(createTextElement("span", "AD lockouts, laptop imaging, basic networking, printer mapping, hardware, security, and escalation cases."));
     els.ticketQueue.append(locked);
   }
 }

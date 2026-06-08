@@ -47,6 +47,9 @@ const progressSkillNames = [
   "Access",
   "SaaS",
   "Windows",
+  "Active Directory",
+  "Provisioning",
+  "Printers",
 ];
 const careerGoalIds = new Set(["help_desk", "it_support", "desktop_support", "security_support"]);
 
