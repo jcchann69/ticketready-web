@@ -866,6 +866,75 @@ textarea:focus-visible {
   line-height: 1.38;
 }
 
+.application-kit-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: #ffffff;
+}
+
+.application-kit-panel.is-pro-active {
+  border-color: rgba(47, 143, 91, 0.44);
+  background: #fbfffd;
+}
+
+.application-kit-panel.is-locked {
+  background: #f8fbfa;
+}
+
+.application-kit__title {
+  align-items: flex-start;
+}
+
+.application-kit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.application-kit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.application-kit-card {
+  min-width: 0;
+  min-height: 154px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fbfdfc;
+}
+
+.application-kit-card__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.application-kit-card strong {
+  display: block;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+  color: var(--teal-dark);
+  font-size: 1rem;
+  line-height: 1.22;
+}
+
+.application-kit-card p {
+  margin-bottom: 0;
+  color: #334441;
+  font-size: 0.84rem;
+  line-height: 1.38;
+}
+
 .interview-coach-panel {
   margin-top: 12px;
   border: 1px solid var(--line);
@@ -1908,6 +1977,10 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .application-kit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .interview-coach-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1943,6 +2016,7 @@ a {
   .drill-recommendations,
   .weekly-report-grid,
   .proof-pack-grid,
+  .application-kit-grid,
   .interview-coach-grid {
     grid-template-columns: 1fr;
   }
@@ -2045,6 +2119,10 @@ a {
   }
 
   .proof-export__actions {
+    justify-content: flex-start;
+  }
+
+  .application-kit__actions {
     justify-content: flex-start;
   }
 

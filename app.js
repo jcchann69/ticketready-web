@@ -1145,6 +1145,11 @@ const els = {
   proofPackStatus: document.querySelector("#proofPackStatus"),
   copyProofPackBtn: document.querySelector("#copyProofPackBtn"),
   downloadProofPackBtn: document.querySelector("#downloadProofPackBtn"),
+  applicationKitPanel: document.querySelector("#applicationKitPanel"),
+  applicationKitBadge: document.querySelector("#applicationKitBadge"),
+  applicationKitBody: document.querySelector("#applicationKitBody"),
+  applicationKitStatus: document.querySelector("#applicationKitStatus"),
+  copyApplicationKitBtn: document.querySelector("#copyApplicationKitBtn"),
   interviewCoachPanel: document.querySelector("#interviewCoachPanel"),
   interviewCoachBadge: document.querySelector("#interviewCoachBadge"),
   mockInterviewQuestion: document.querySelector("#mockInterviewQuestion"),
@@ -1171,6 +1176,7 @@ let accountEmail = localStorage.getItem("ticketReadyLastEmail") || "";
 let authToken = localStorage.getItem("ticketReadyAuthToken") || "";
 let weeklyReportText = "";
 let proofPackText = "";
+let applicationKitText = "";
 
 const progress = loadProgress();
 
@@ -2204,6 +2210,104 @@ function createProofCard(label, value, detail) {
   return card;
 }
 
+function createApplicationCard(label, value, detail) {
+  const card = document.createElement("article");
+  card.className = "application-kit-card";
+  card.append(createTextElement("span", label, "application-kit-card__label"));
+  card.append(createTextElement("strong", value));
+  card.append(createTextElement("p", detail));
+  return card;
+}
+
+function buildApplicationKit() {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  const readiness = calculateReadiness();
+  const topEvidence = getTopEvidence(3);
+  const bestEvidence = topEvidence[0];
+  const { strongSkills, weakSkills } = getSkillSummary();
+  const bestInterview = progress.interviews.slice().sort((first, second) => Number(second.score || 0) - Number(first.score || 0))[0];
+  const proofCount = progress.evidence.length;
+  const strongestCase = bestEvidence
+    ? `${bestEvidence.ticketId}: ${bestEvidence.title} (${bestEvidence.score}/100)`
+    : "Complete a scored ticket to create your first evidence case.";
+  const projectSummary = bestEvidence
+    ? `Built a TicketReady ${careerGoal.proof} project by resolving ${progress.solved} simulated service desk cases, including ${strongestCase}, while documenting impact, action path, and user confirmation.`
+    : `Building a TicketReady ${careerGoal.proof} project with simulated service desk cases focused on ${careerGoal.skills.join(", ")}.`;
+  const linkedInLine = bestEvidence
+    ? `Currently practicing ${careerGoal.label} workflows through TicketReady simulations: ${progress.solved} tickets completed, ${readiness}% readiness, strongest skills in ${strongSkills.join(", ")}.`
+    : `Currently practicing ${careerGoal.label} workflows through TicketReady simulations focused on ${careerGoal.skills.join(", ")}.`;
+  const interviewOpener = bestEvidence
+    ? `One training example I can talk through is ${bestEvidence.title}. I identified the business impact, chose a safe first action, documented the resolution path, and scored ${bestEvidence.score}/100.`
+    : `I am using TicketReady to practice realistic ${careerGoal.label} tickets and build examples around triage, safe action, documentation, and communication.`;
+  const nextGap = weakSkills[0] || getDrillFocusSkill();
+  const nextAction = `Next practice target: ${nextGap}. Complete two related drills, then update this kit with the strongest new evidence.`;
+
+  return {
+    careerGoal,
+    readiness,
+    proofCount,
+    strongestCase,
+    projectSummary,
+    linkedInLine,
+    interviewOpener,
+    nextAction,
+    text: [
+      "TicketReady Application Kit",
+      `Target role: ${careerGoal.label}`,
+      `Readiness: ${readiness}%`,
+      `Tickets completed: ${progress.solved}`,
+      `Saved evidence cases: ${proofCount}`,
+      "",
+      "Resume Project Summary:",
+      projectSummary,
+      "",
+      "LinkedIn / Portfolio Line:",
+      linkedInLine,
+      "",
+      "Interview Opener:",
+      interviewOpener,
+      "",
+      "Evidence Highlights:",
+      ...(topEvidence.length ? topEvidence.map((entry) => `- ${entry.ticketId}: ${entry.title} (${entry.score}/100)`) : ["- Complete scored tickets to create evidence highlights."]),
+      "",
+      "Next Action:",
+      nextAction,
+      bestInterview ? `\nBest mock interview answer score: ${bestInterview.score}/100` : "",
+    ].filter(Boolean).join("\n"),
+  };
+}
+
+function renderApplicationKit() {
+  els.applicationKitBody.replaceChildren();
+  els.applicationKitPanel.classList.toggle("is-pro-active", proActive);
+  els.applicationKitPanel.classList.toggle("is-locked", !proActive);
+
+  const kit = buildApplicationKit();
+  applicationKitText = proActive ? kit.text : "";
+  els.applicationKitBadge.textContent = proActive ? `${kit.proofCount} proof` : "Locked";
+  els.copyApplicationKitBtn.disabled = !proActive || !kit.proofCount;
+
+  if (!proActive) {
+    els.applicationKitBody.append(
+      createApplicationCard("Resume project", "Pro", "Turn completed TicketReady cases into honest project wording."),
+      createApplicationCard("LinkedIn line", "Ready", "Summarize your target role, practice volume, readiness, and strongest skills."),
+      createApplicationCard("Interview opener", "Guided", "Start answers with a specific case, impact, action, and result.")
+    );
+    els.applicationKitStatus.textContent = "Subscribe to convert your saved evidence into application-ready wording.";
+    return;
+  }
+
+  els.applicationKitBody.append(
+    createApplicationCard("Resume Project", kit.careerGoal.shortLabel, kit.projectSummary),
+    createApplicationCard("LinkedIn Line", `${kit.readiness}% ready`, kit.linkedInLine),
+    createApplicationCard("Interview Opener", kit.proofCount ? `${kit.proofCount} cases` : "Start", kit.interviewOpener)
+  );
+
+  els.applicationKitStatus.textContent = kit.proofCount
+    ? "Application kit ready to copy for resume projects, LinkedIn notes, and interview prep."
+    : "Finish a scored ticket to unlock application-ready wording.";
+}
+
 function buildWeeklyReport() {
   const evidence = getWeeklyEvidence();
   const readiness = calculateReadiness();
@@ -2417,6 +2521,7 @@ function renderProDashboard() {
   renderDrillCoach();
   renderWeeklyReport();
   renderProofPack();
+  renderApplicationKit();
   renderMockInterviewCoach();
   renderTrainingPath();
 }
@@ -2922,6 +3027,32 @@ function downloadProofPack() {
   els.proofPackStatus.textContent = "Proof pack downloaded.";
 }
 
+function copyApplicationKit() {
+  const fallback = applicationKitText || "Complete a Pro ticket first to create your application kit.";
+
+  if (!applicationKitText) {
+    els.applicationKitStatus.textContent = fallback;
+    return;
+  }
+
+  if (navigator.clipboard) {
+    navigator.clipboard
+      .writeText(fallback)
+      .then(() => {
+        els.copyApplicationKitBtn.textContent = "Copied";
+        els.applicationKitStatus.textContent = "Application kit copied.";
+        setTimeout(() => {
+          els.copyApplicationKitBtn.textContent = "Copy Kit";
+        }, 1600);
+      })
+      .catch(() => {
+        els.applicationKitStatus.textContent = fallback;
+      });
+  } else {
+    els.applicationKitStatus.textContent = fallback;
+  }
+}
+
 function scoreInterviewAnswer() {
   if (!proActive) {
     els.mockInterviewStatus.textContent = "Pro unlocks scored mock interview answers.";
@@ -3205,6 +3336,7 @@ function bindEvents() {
   els.copyWeeklyReportBtn.addEventListener("click", copyWeeklyReport);
   els.copyProofPackBtn.addEventListener("click", copyProofPack);
   els.downloadProofPackBtn.addEventListener("click", downloadProofPack);
+  els.copyApplicationKitBtn.addEventListener("click", copyApplicationKit);
   els.missionCtaBtn.addEventListener("click", handleMissionCta);
   els.drillCoachBtn.addEventListener("click", handleDrillCoachClick);
   els.drillRecommendations.addEventListener("click", handleDrillCoachClick);
