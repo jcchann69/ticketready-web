@@ -1100,6 +1100,17 @@ const els = {
   proofPackStatus: document.querySelector("#proofPackStatus"),
   copyProofPackBtn: document.querySelector("#copyProofPackBtn"),
   downloadProofPackBtn: document.querySelector("#downloadProofPackBtn"),
+  interviewCoachPanel: document.querySelector("#interviewCoachPanel"),
+  interviewCoachBadge: document.querySelector("#interviewCoachBadge"),
+  mockInterviewQuestion: document.querySelector("#mockInterviewQuestion"),
+  mockInterviewAnswer: document.querySelector("#mockInterviewAnswer"),
+  scoreInterviewBtn: document.querySelector("#scoreInterviewBtn"),
+  copyInterviewAnswerBtn: document.querySelector("#copyInterviewAnswerBtn"),
+  mockInterviewScore: document.querySelector("#mockInterviewScore"),
+  mockInterviewSummary: document.querySelector("#mockInterviewSummary"),
+  mockInterviewFeedback: document.querySelector("#mockInterviewFeedback"),
+  mockInterviewHistory: document.querySelector("#mockInterviewHistory"),
+  mockInterviewStatus: document.querySelector("#mockInterviewStatus"),
 };
 
 let activeTicketIndex = 0;
@@ -1126,6 +1137,7 @@ function getEmptyProgress() {
     scores: [],
     skills: Object.fromEntries(skillNames.map((skill) => [skill, 0])),
     evidence: [],
+    interviews: [],
   };
 }
 
@@ -1138,6 +1150,7 @@ function normalizeProgressRecord(saved = {}) {
     scores: Array.isArray(saved.scores) ? saved.scores.slice(-20).map((score) => Number(score || 0)) : [],
     skills: { ...empty.skills, ...(saved.skills || {}) },
     evidence: Array.isArray(saved.evidence) ? saved.evidence.slice(0, 20) : [],
+    interviews: Array.isArray(saved.interviews) ? saved.interviews.slice(0, 20) : [],
   };
 }
 
@@ -1199,6 +1212,14 @@ function mergeProgressRecords(localProgress, remoteProgress) {
     }
   });
 
+  const interviewMap = new Map();
+  [...localRecord.interviews, ...remoteRecord.interviews].forEach((entry) => {
+    const key = `${entry.createdAt}|${entry.score}|${entry.question}`;
+    if (!interviewMap.has(key)) {
+      interviewMap.set(key, entry);
+    }
+  });
+
   return {
     xp: Math.max(localRecord.xp, remoteRecord.xp),
     solved: Math.max(localRecord.solved, remoteRecord.solved),
@@ -1206,6 +1227,9 @@ function mergeProgressRecords(localProgress, remoteProgress) {
     scores: [...remoteRecord.scores, ...localRecord.scores].slice(-20),
     skills,
     evidence: Array.from(evidenceMap.values())
+      .sort((first, second) => String(second.createdAt).localeCompare(String(first.createdAt)))
+      .slice(0, 20),
+    interviews: Array.from(interviewMap.values())
       .sort((first, second) => String(second.createdAt).localeCompare(String(first.createdAt)))
       .slice(0, 20),
   };
@@ -1219,6 +1243,7 @@ function applyProgress(nextProgress) {
   progress.scores = cleanProgress.scores;
   progress.skills = cleanProgress.skills;
   progress.evidence = cleanProgress.evidence;
+  progress.interviews = cleanProgress.interviews;
   saveProgress();
 }
 
@@ -1258,6 +1283,7 @@ function getReadinessMilestones() {
   const recentScores = progress.scores.slice(-5);
   const recentAverage = getAverageScore(5);
   const strongEvidence = progress.evidence.filter((entry) => Number(entry.score || 0) >= 80).length;
+  const interviewReps = progress.interviews.length;
 
   return [
     {
@@ -1295,6 +1321,12 @@ function getReadinessMilestones() {
       detail: "Use a strong case to explain impact, action, and documentation.",
       value: `${Math.min(strongEvidence, 1)}/1`,
       complete: strongEvidence >= 1,
+    },
+    {
+      label: "Score a mock interview answer",
+      detail: "Practice explaining a case out loud before a real interview.",
+      value: `${Math.min(interviewReps, 1)}/1`,
+      complete: interviewReps >= 1,
     },
   ];
 }
@@ -1535,6 +1567,96 @@ function buildInterviewPrompt(ticket) {
   return `Tell me about ${ticket.title}. Explain the business impact, why you chose ${ticket.priority}, your first safe action, and how you documented the outcome.`;
 }
 
+function getCurrentInterviewQuestion() {
+  const latestEvidence = progress.evidence[0];
+  if (latestEvidence?.interviewPrompt) {
+    return latestEvidence.interviewPrompt;
+  }
+
+  return buildInterviewPrompt(tickets[activeTicketIndex]);
+}
+
+function getCurrentInterviewTicketId() {
+  return progress.evidence[0]?.ticketId || tickets[activeTicketIndex].id;
+}
+
+function includesAny(text, terms) {
+  const lower = text.toLowerCase();
+  return terms.some((term) => lower.includes(term));
+}
+
+function scoreMockInterviewAnswer(answer) {
+  const cleanAnswer = answer.trim();
+  const wordCount = cleanAnswer ? cleanAnswer.split(/\s+/).length : 0;
+  const notes = [];
+  let score = 0;
+
+  if (wordCount >= 40) {
+    score += 12;
+    notes.push("Enough detail to judge your process.");
+  } else if (wordCount >= 20) {
+    score += 6;
+    notes.push("Good start, but add more detail about the situation and result.");
+  } else {
+    notes.push("Answer is too short. Aim for 40+ words.");
+  }
+
+  if (includesAny(cleanAnswer, ["impact", "deadline", "business", "affected", "scope", "priority", "urgent", "risk"])) {
+    score += 18;
+    notes.push("You explained business impact.");
+  } else {
+    notes.push("Add the business impact or urgency.");
+  }
+
+  if (includesAny(cleanAnswer, ["verify", "collect", "check", "confirm", "test", "reset", "quarantine", "escalate", "approve", "approval", "logs"])) {
+    score += 20;
+    notes.push("You described concrete support actions.");
+  } else {
+    notes.push("Name the specific troubleshooting or fulfillment actions.");
+  }
+
+  if (includesAny(cleanAnswer, ["identity", "mfa", "security", "policy", "approved", "least privilege", "contain", "safe"])) {
+    score += 16;
+    notes.push("You protected safe process.");
+  } else {
+    notes.push("Mention how you avoided risky shortcuts.");
+  }
+
+  if (includesAny(cleanAnswer, ["document", "notes", "note", "evidence", "timestamp", "resolution details"])) {
+    score += 14;
+    notes.push("You included documentation.");
+  } else {
+    notes.push("Add how you documented the ticket.");
+  }
+
+  if (includesAny(cleanAnswer, ["resolved", "confirmed", "result", "outcome", "follow", "user verified", "working"])) {
+    score += 16;
+    notes.push("You included a result or confirmation.");
+  } else {
+    notes.push("Close with the result and how you confirmed it.");
+  }
+
+  if (includesAny(cleanAnswer, ["explain", "communicate", "update", "coach", "expectation", "calm", "clear"])) {
+    score += 10;
+    notes.push("You showed communication skills.");
+  } else {
+    notes.push("Add how you communicated with the user.");
+  }
+
+  score = Math.min(100, Math.round(score));
+
+  return {
+    score,
+    notes: notes.slice(0, 8),
+    summary:
+      score >= 80
+        ? "Strong interview answer. It connects impact, safe action, documentation, and result."
+        : score >= 55
+          ? "Good structure. Add the missing pieces before using this in a real interview."
+          : "Needs more structure. Use situation, impact, action, documentation, and result.",
+  };
+}
+
 function buildEvidenceStory(ticket, result) {
   const actionSummary = getSelectedActionLabels(result.selected).map((label) => label.toLowerCase()).join(", ") || "no action path selected";
   return [
@@ -1771,6 +1893,7 @@ function buildProofPack() {
   const readiness = calculateReadiness();
   const topEvidence = getTopEvidence(5);
   const { strongSkills, weakSkills } = getSkillSummary();
+  const topInterview = progress.interviews.slice().sort((first, second) => Number(second.score || 0) - Number(first.score || 0))[0];
   const interviewPrompts = topEvidence
     .map((entry) => entry.interviewPrompt)
     .filter(Boolean)
@@ -1793,6 +1916,8 @@ function buildProofPack() {
       `Readiness: ${readiness}%`,
       `Tickets completed: ${progress.solved}`,
       `Best score: ${progress.best}/100`,
+      `Mock interview reps: ${progress.interviews.length}`,
+      `Best interview score: ${topInterview ? `${topInterview.score}/100` : "No interview reps yet"}`,
       `Strong skills: ${strongSkills.join(", ")}`,
       `Next focus: ${nextFocus}`,
       "",
@@ -1801,6 +1926,9 @@ function buildProofPack() {
       "",
       "Interview Stories To Practice:",
       ...(interviewPrompts.length ? interviewPrompts.map((prompt, index) => `${index + 1}. ${prompt}`) : ["1. Complete a scored ticket to generate an interview story."]),
+      "",
+      "Best Mock Interview Answer:",
+      topInterview ? `${topInterview.question}\nScore: ${topInterview.score}/100\n${topInterview.answer}` : "Complete a mock interview rep to add an answer here.",
       "",
       "Evidence Notes:",
       ...(topEvidence.length ? topEvidence.map((entry) => `- ${entry.ticketId || "Ticket"}: ${entry.summary || entry.title || "Saved training evidence."}`) : ["- No saved evidence yet."]),
@@ -1934,6 +2062,66 @@ function renderProofPack() {
     : "Finish a scored ticket to generate your first proof pack.";
 }
 
+function renderMockInterviewCoach(lastResult) {
+  const latestInterview = progress.interviews[0];
+  const interviewCount = progress.interviews.length;
+  const bestInterviewScore = progress.interviews.reduce((best, entry) => Math.max(best, Number(entry.score || 0)), 0);
+
+  els.interviewCoachPanel.classList.toggle("is-pro-active", proActive);
+  els.interviewCoachPanel.classList.toggle("is-locked", !proActive);
+  els.interviewCoachBadge.textContent = proActive
+    ? `${interviewCount} reps`
+    : "Locked";
+  els.mockInterviewQuestion.textContent = getCurrentInterviewQuestion();
+  els.scoreInterviewBtn.disabled = !proActive;
+  els.copyInterviewAnswerBtn.disabled = !proActive;
+
+  if (lastResult) {
+    els.mockInterviewScore.textContent = `${lastResult.score}/100`;
+    els.mockInterviewSummary.textContent = lastResult.summary;
+    els.mockInterviewFeedback.replaceChildren(...lastResult.notes.map((note) => createTextElement("li", note)));
+  } else if (latestInterview) {
+    els.mockInterviewScore.textContent = `${latestInterview.score}/100`;
+    els.mockInterviewSummary.textContent = latestInterview.summary || "Latest saved interview answer.";
+    els.mockInterviewFeedback.replaceChildren(...(latestInterview.notes || []).map((note) => createTextElement("li", note)));
+  } else {
+    els.mockInterviewScore.textContent = "0/100";
+    els.mockInterviewSummary.textContent = proActive
+      ? "Answer a prompt to get structure feedback."
+      : "Pro unlocks scored mock interview answers.";
+    els.mockInterviewFeedback.replaceChildren();
+  }
+
+  els.mockInterviewHistory.replaceChildren();
+  if (!proActive) {
+    const locked = document.createElement("div");
+    locked.className = "interview-history__empty";
+    locked.textContent = "Pro saves interview reps and adds your best answer to the proof pack.";
+    els.mockInterviewHistory.append(locked);
+    els.mockInterviewStatus.textContent = "Subscribe to score answers for impact, safe process, documentation, and communication.";
+    return;
+  }
+
+  if (!interviewCount) {
+    const empty = document.createElement("div");
+    empty.className = "interview-history__empty";
+    empty.textContent = "No interview reps yet. Use the prompt to practice your first answer.";
+    els.mockInterviewHistory.append(empty);
+    els.mockInterviewStatus.textContent = "Pro scores answers for impact, safe process, documentation, and clear communication.";
+    return;
+  }
+
+  progress.interviews.slice(0, 3).forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "interview-history__item";
+    item.append(createTextElement("strong", `${entry.score}/100 - ${entry.ticketId || "Interview rep"}`));
+    item.append(createTextElement("span", entry.summary || entry.question));
+    els.mockInterviewHistory.append(item);
+  });
+
+  els.mockInterviewStatus.textContent = `Best mock interview score: ${bestInterviewScore}/100. Keep refining answers before filming or applying.`;
+}
+
 function renderProDashboard() {
   const readiness = calculateReadiness();
   const rampDay = Math.min(30, Math.max(1, progress.solved + 1));
@@ -1962,6 +2150,7 @@ function renderProDashboard() {
   renderReadinessChecklist();
   renderWeeklyReport();
   renderProofPack();
+  renderMockInterviewCoach();
   renderTrainingPath();
 }
 
@@ -2425,6 +2614,63 @@ function downloadProofPack() {
   els.proofPackStatus.textContent = "Proof pack downloaded.";
 }
 
+function scoreInterviewAnswer() {
+  if (!proActive) {
+    els.mockInterviewStatus.textContent = "Pro unlocks scored mock interview answers.";
+    return;
+  }
+
+  const answer = els.mockInterviewAnswer.value.trim();
+  if (!answer) {
+    els.mockInterviewStatus.textContent = "Type an answer first, then score it.";
+    return;
+  }
+
+  const question = getCurrentInterviewQuestion();
+  const result = scoreMockInterviewAnswer(answer);
+  progress.interviews.unshift({
+    question,
+    answer,
+    score: result.score,
+    summary: result.summary,
+    notes: result.notes,
+    ticketId: getCurrentInterviewTicketId(),
+    createdAt: new Date().toISOString(),
+  });
+  progress.interviews = progress.interviews.slice(0, 20);
+  progress.xp += Math.max(10, Math.round(result.score / 4));
+  saveProgress();
+  syncProgressToAccount("Saving interview practice...");
+  renderStats();
+  renderMockInterviewCoach(result);
+}
+
+function copyInterviewAnswer() {
+  const answer = els.mockInterviewAnswer.value.trim();
+  if (!answer) {
+    els.mockInterviewStatus.textContent = "Type an answer first, then copy it.";
+    return;
+  }
+
+  const text = [`Question: ${getCurrentInterviewQuestion()}`, "", answer].join("\n");
+  if (navigator.clipboard) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        els.copyInterviewAnswerBtn.textContent = "Copied";
+        els.mockInterviewStatus.textContent = "Interview answer copied.";
+        setTimeout(() => {
+          els.copyInterviewAnswerBtn.textContent = "Copy Answer";
+        }, 1600);
+      })
+      .catch(() => {
+        els.mockInterviewStatus.textContent = text;
+      });
+  } else {
+    els.mockInterviewStatus.textContent = text;
+  }
+}
+
 async function loadPaymentConfig() {
   try {
     const response = await fetch("/api/config");
@@ -2651,6 +2897,8 @@ function bindEvents() {
   els.copyWeeklyReportBtn.addEventListener("click", copyWeeklyReport);
   els.copyProofPackBtn.addEventListener("click", copyProofPack);
   els.downloadProofPackBtn.addEventListener("click", downloadProofPack);
+  els.scoreInterviewBtn.addEventListener("click", scoreInterviewAnswer);
+  els.copyInterviewAnswerBtn.addEventListener("click", copyInterviewAnswer);
   els.accountForm.addEventListener("submit", handleAccountSync);
   els.verifyLoginCodeBtn.addEventListener("click", verifyLoginCode);
   els.signOutBtn.addEventListener("click", signOut);

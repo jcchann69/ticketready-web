@@ -522,6 +522,7 @@ function createEmptyProgress() {
     scores: [],
     skills: Object.fromEntries(progressSkillNames.map((skill) => [skill, 0])),
     evidence: [],
+    interviews: [],
   };
 }
 
@@ -546,6 +547,20 @@ function sanitizeProgress(input = {}) {
       }))
     : [];
 
+  const interviews = Array.isArray(input.interviews)
+    ? input.interviews.slice(0, 20).map((entry) => ({
+        question: limitText(entry?.question, 360),
+        answer: limitText(entry?.answer, 1200),
+        score: Math.round(clampNumber(entry?.score, 0, 100)),
+        summary: limitText(entry?.summary, 280),
+        notes: Array.isArray(entry?.notes)
+          ? entry.notes.slice(0, 8).map((note) => limitText(note, 180)).filter(Boolean)
+          : [],
+        ticketId: limitText(entry?.ticketId, 24),
+        createdAt: limitText(entry?.createdAt, 40) || new Date().toISOString(),
+      }))
+    : [];
+
   return {
     xp: Math.round(clampNumber(input.xp, 0, 1000000)),
     solved: Math.round(clampNumber(input.solved, 0, 10000)),
@@ -555,6 +570,7 @@ function sanitizeProgress(input = {}) {
       : [],
     skills,
     evidence,
+    interviews,
   };
 }
 
@@ -574,6 +590,14 @@ function mergeProgress(existing = {}, incoming = {}) {
     }
   });
 
+  const interviewMap = new Map();
+  [...saved.interviews, ...next.interviews].forEach((entry) => {
+    const key = `${entry.createdAt}|${entry.score}|${entry.question}`;
+    if (!interviewMap.has(key)) {
+      interviewMap.set(key, entry);
+    }
+  });
+
   return {
     xp: Math.max(saved.xp, next.xp),
     solved: Math.max(saved.solved, next.solved),
@@ -581,6 +605,9 @@ function mergeProgress(existing = {}, incoming = {}) {
     scores: [...saved.scores, ...next.scores].slice(-20),
     skills,
     evidence: Array.from(evidenceMap.values())
+      .sort((first, second) => String(second.createdAt).localeCompare(String(first.createdAt)))
+      .slice(0, 20),
+    interviews: Array.from(interviewMap.values())
       .sort((first, second) => String(second.createdAt).localeCompare(String(first.createdAt)))
       .slice(0, 20),
   };

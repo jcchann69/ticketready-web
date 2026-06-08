@@ -91,7 +91,7 @@
           <article class="dashboard-card dashboard-card--readiness">
             <div class="pane-title">
               <h3>Job-Ready Checklist</h3>
-              <span class="badge" id="readinessChecklistBadge">0/6</span>
+              <span class="badge" id="readinessChecklistBadge">0/7</span>
             </div>
             <div id="readinessChecklist" class="readiness-checklist"></div>
             <p class="fine-print" id="readinessChecklistCopy">Resolve tickets to build proof for entry-level support interviews.</p>
@@ -127,6 +127,39 @@
           </div>
           <div id="proofPackBody" class="proof-pack-grid"></div>
           <p class="fine-print" id="proofPackStatus" aria-live="polite">Pro exports your strongest simulated cases into honest resume and interview prep notes.</p>
+        </section>
+
+        <section class="interview-coach-panel" id="interviewCoachPanel" aria-labelledby="interviewCoachTitle">
+          <div class="pane-title interview-coach__title">
+            <div>
+              <p class="eyebrow">Mock Interview</p>
+              <h3 id="interviewCoachTitle">Answer Coach</h3>
+            </div>
+            <span class="badge" id="interviewCoachBadge">0 reps</span>
+          </div>
+          <div class="interview-coach-grid">
+            <article class="interview-card interview-card--answer">
+              <span class="interview-card__label">Prompt</span>
+              <p id="mockInterviewQuestion">Complete a scored ticket to generate an interview prompt.</p>
+              <label class="sr-only" for="mockInterviewAnswer">Interview answer</label>
+              <textarea id="mockInterviewAnswer" rows="6" placeholder="Type your answer using situation, impact, action, and result."></textarea>
+              <div class="interview-actions">
+                <button class="button button--primary compact-button" id="scoreInterviewBtn" type="button">Score Answer</button>
+                <button class="button button--secondary compact-button" id="copyInterviewAnswerBtn" type="button">Copy Answer</button>
+              </div>
+            </article>
+            <article class="interview-card interview-card--score">
+              <span class="interview-card__label">Coach Score</span>
+              <strong id="mockInterviewScore">0/100</strong>
+              <p id="mockInterviewSummary">Answer a prompt to get structure feedback.</p>
+              <ul id="mockInterviewFeedback"></ul>
+            </article>
+            <article class="interview-card interview-card--history">
+              <span class="interview-card__label">Recent Practice</span>
+              <div id="mockInterviewHistory" class="interview-history"></div>
+            </article>
+          </div>
+          <p class="fine-print" id="mockInterviewStatus" aria-live="polite">Pro scores answers for impact, safe process, documentation, and clear communication.</p>
         </section>
 
         <section class="path-panel" aria-labelledby="pathTitle">

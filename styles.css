@@ -35,7 +35,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -157,7 +158,8 @@ h4 {
 .action-button:focus-visible,
 .ticket-row:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid rgba(243, 166, 45, 0.42);
   outline-offset: 2px;
 }
@@ -563,6 +565,115 @@ select:focus-visible {
   margin-bottom: 0;
   color: #334441;
   font-size: 0.84rem;
+  line-height: 1.38;
+}
+
+.interview-coach-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: #ffffff;
+}
+
+.interview-coach-panel.is-pro-active {
+  border-color: rgba(47, 143, 91, 0.44);
+  background: #fbfffd;
+}
+
+.interview-coach-panel.is-locked {
+  background: #fffaf0;
+}
+
+.interview-coach__title {
+  align-items: flex-start;
+}
+
+.interview-coach-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.28fr) minmax(220px, 0.72fr) minmax(220px, 0.8fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.interview-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fbfdfc;
+}
+
+.interview-card__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.interview-card p {
+  margin-bottom: 10px;
+  color: #334441;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.interview-card--score strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--teal-dark);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.interview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#mockInterviewFeedback {
+  margin: 0;
+  padding-left: 18px;
+}
+
+#mockInterviewFeedback li {
+  margin-bottom: 7px;
+  color: #3c4c49;
+  font-size: 0.84rem;
+  line-height: 1.36;
+}
+
+.interview-history {
+  display: grid;
+  gap: 8px;
+}
+
+.interview-history__item,
+.interview-history__empty {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: #ffffff;
+}
+
+.interview-history__item {
+  display: grid;
+  gap: 4px;
+}
+
+.interview-history__item strong {
+  color: var(--teal-dark);
+  font-size: 0.88rem;
+}
+
+.interview-history__item span,
+.interview-history__empty {
+  color: var(--muted);
+  font-size: 0.82rem;
   line-height: 1.38;
 }
 
@@ -1019,7 +1130,8 @@ legend {
 }
 
 select,
-input {
+input,
+textarea {
   min-height: 42px;
   width: 100%;
   border: 1px solid var(--line);
@@ -1027,6 +1139,22 @@ input {
   padding: 0 11px;
   color: var(--ink);
   background: #ffffff;
+}
+
+textarea {
+  min-height: 132px;
+  padding: 11px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 fieldset {
@@ -1454,6 +1582,14 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .interview-coach-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .interview-card--answer {
+    grid-column: 1 / -1;
+  }
+
   .path-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1477,11 +1613,16 @@ a {
   .outcome-grid,
   .dashboard-grid,
   .weekly-report-grid,
-  .proof-pack-grid {
+  .proof-pack-grid,
+  .interview-coach-grid {
     grid-template-columns: 1fr;
   }
 
   .dashboard-card--plan {
+    grid-column: auto;
+  }
+
+  .interview-card--answer {
     grid-column: auto;
   }
 
