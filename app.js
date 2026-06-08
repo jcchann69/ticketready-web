@@ -1094,6 +1094,12 @@ const els = {
   weeklyReportBody: document.querySelector("#weeklyReportBody"),
   weeklyReportStatus: document.querySelector("#weeklyReportStatus"),
   copyWeeklyReportBtn: document.querySelector("#copyWeeklyReportBtn"),
+  proofExportPanel: document.querySelector("#proofExportPanel"),
+  proofPackBadge: document.querySelector("#proofPackBadge"),
+  proofPackBody: document.querySelector("#proofPackBody"),
+  proofPackStatus: document.querySelector("#proofPackStatus"),
+  copyProofPackBtn: document.querySelector("#copyProofPackBtn"),
+  downloadProofPackBtn: document.querySelector("#downloadProofPackBtn"),
 };
 
 let activeTicketIndex = 0;
@@ -1108,6 +1114,7 @@ let proActive = localStorage.getItem("ticketReadyProActive") === "true";
 let accountEmail = localStorage.getItem("ticketReadyLastEmail") || "";
 let authToken = localStorage.getItem("ticketReadyAuthToken") || "";
 let weeklyReportText = "";
+let proofPackText = "";
 
 const progress = loadProgress();
 
@@ -1747,6 +1754,69 @@ function createReportCard(label, value, detail) {
   return card;
 }
 
+function getTopEvidence(limit = 5) {
+  return progress.evidence
+    .slice()
+    .sort((first, second) => Number(second.score || 0) - Number(first.score || 0))
+    .slice(0, limit);
+}
+
+function formatResumeBullet(entry) {
+  const title = entry.title || "service desk support case";
+  const score = Number(entry.score || 0);
+  return `TicketReady training project: resolved simulated service desk case "${title}" with a ${score}/100 score, documenting impact, safe action path, and user confirmation.`;
+}
+
+function buildProofPack() {
+  const readiness = calculateReadiness();
+  const topEvidence = getTopEvidence(5);
+  const { strongSkills, weakSkills } = getSkillSummary();
+  const interviewPrompts = topEvidence
+    .map((entry) => entry.interviewPrompt)
+    .filter(Boolean)
+    .slice(0, 3);
+  const resumeBullets = topEvidence.map(formatResumeBullet).slice(0, 5);
+  const nextFocus = weakSkills[0] || getWeakestSkill();
+
+  return {
+    topEvidence,
+    resumeBullets,
+    interviewPrompts,
+    strongSkills,
+    weakSkills,
+    nextFocus,
+    readiness,
+    text: [
+      "TicketReady Training Proof Pack",
+      "Use this honestly under a resume Projects, Training, or Portfolio section.",
+      "",
+      `Readiness: ${readiness}%`,
+      `Tickets completed: ${progress.solved}`,
+      `Best score: ${progress.best}/100`,
+      `Strong skills: ${strongSkills.join(", ")}`,
+      `Next focus: ${nextFocus}`,
+      "",
+      "Resume / Portfolio Bullets:",
+      ...(resumeBullets.length ? resumeBullets.map((bullet) => `- ${bullet}`) : ["- Complete scored tickets to generate honest training bullets."]),
+      "",
+      "Interview Stories To Practice:",
+      ...(interviewPrompts.length ? interviewPrompts.map((prompt, index) => `${index + 1}. ${prompt}`) : ["1. Complete a scored ticket to generate an interview story."]),
+      "",
+      "Evidence Notes:",
+      ...(topEvidence.length ? topEvidence.map((entry) => `- ${entry.ticketId || "Ticket"}: ${entry.summary || entry.title || "Saved training evidence."}`) : ["- No saved evidence yet."]),
+    ].join("\n"),
+  };
+}
+
+function createProofCard(label, value, detail) {
+  const card = document.createElement("article");
+  card.className = "proof-pack-card";
+  card.append(createTextElement("span", label, "proof-pack-card__label"));
+  card.append(createTextElement("strong", value));
+  card.append(createTextElement("p", detail));
+  return card;
+}
+
 function buildWeeklyReport() {
   const evidence = getWeeklyEvidence();
   const readiness = calculateReadiness();
@@ -1820,6 +1890,50 @@ function renderWeeklyReport() {
     : "Finish a scored ticket to generate your first weekly report.";
 }
 
+function renderProofPack() {
+  els.proofPackBody.replaceChildren();
+  els.proofExportPanel.classList.toggle("is-pro-active", proActive);
+  els.proofExportPanel.classList.toggle("is-locked", !proActive);
+
+  const proofPack = buildProofPack();
+  proofPackText = proActive ? proofPack.text : "";
+  els.proofPackBadge.textContent = proActive ? `${proofPack.topEvidence.length} cases` : "Locked";
+  els.copyProofPackBtn.disabled = !proActive || !proofPack.topEvidence.length;
+  els.downloadProofPackBtn.disabled = !proActive || !proofPack.topEvidence.length;
+
+  if (!proActive) {
+    els.proofPackBody.append(
+      createProofCard("Resume bullets", "Pro", "Export honest training bullets from your strongest scored tickets."),
+      createProofCard("Interview prep", "Stories", "Turn simulated cases into answer prompts about impact, action, and documentation."),
+      createProofCard("Skill proof", "Tracked", "Show your best skills and the next gap to train before interviews.")
+    );
+    els.proofPackStatus.textContent = "Subscribe to export resume/project bullets from your saved training evidence.";
+    return;
+  }
+
+  els.proofPackBody.append(
+    createProofCard(
+      "Resume Bullets",
+      proofPack.resumeBullets.length ? `${proofPack.resumeBullets.length} ready` : "Start",
+      proofPack.resumeBullets[0] || "Complete a scored ticket to generate your first training bullet."
+    ),
+    createProofCard(
+      "Interview Stories",
+      proofPack.interviewPrompts.length ? `${proofPack.interviewPrompts.length} prompts` : "Start",
+      proofPack.interviewPrompts[0] || "Your strongest cases become interview prompts after scoring."
+    ),
+    createProofCard(
+      "Skill Summary",
+      proofPack.strongSkills.join(", "),
+      `Next focus: ${proofPack.nextFocus}. Readiness: ${proofPack.readiness}%.`
+    )
+  );
+
+  els.proofPackStatus.textContent = proofPack.topEvidence.length
+    ? "Proof pack ready to copy or download for resume projects, portfolio notes, and interview prep."
+    : "Finish a scored ticket to generate your first proof pack.";
+}
+
 function renderProDashboard() {
   const readiness = calculateReadiness();
   const rampDay = Math.min(30, Math.max(1, progress.solved + 1));
@@ -1847,6 +1961,7 @@ function renderProDashboard() {
   renderEvidenceVault();
   renderReadinessChecklist();
   renderWeeklyReport();
+  renderProofPack();
   renderTrainingPath();
 }
 
@@ -2266,6 +2381,50 @@ function copyWeeklyReport() {
   }
 }
 
+function copyProofPack() {
+  const fallback = proofPackText || "Complete a Pro ticket first to create a resume proof pack.";
+
+  if (!proofPackText) {
+    els.proofPackStatus.textContent = fallback;
+    return;
+  }
+
+  if (navigator.clipboard) {
+    navigator.clipboard
+      .writeText(fallback)
+      .then(() => {
+        els.copyProofPackBtn.textContent = "Copied";
+        els.proofPackStatus.textContent = "Proof pack copied.";
+        setTimeout(() => {
+          els.copyProofPackBtn.textContent = "Copy Pack";
+        }, 1600);
+      })
+      .catch(() => {
+        els.proofPackStatus.textContent = fallback;
+      });
+  } else {
+    els.proofPackStatus.textContent = fallback;
+  }
+}
+
+function downloadProofPack() {
+  if (!proofPackText) {
+    els.proofPackStatus.textContent = "Complete a Pro ticket first to create a resume proof pack.";
+    return;
+  }
+
+  const blob = new Blob([proofPackText], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ticketready-proof-pack-${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  els.proofPackStatus.textContent = "Proof pack downloaded.";
+}
+
 async function loadPaymentConfig() {
   try {
     const response = await fetch("/api/config");
@@ -2490,6 +2649,8 @@ function bindEvents() {
   els.copyClipBtn.addEventListener("click", copyCreatorScript);
   els.copyEvidenceBtn.addEventListener("click", copyEvidence);
   els.copyWeeklyReportBtn.addEventListener("click", copyWeeklyReport);
+  els.copyProofPackBtn.addEventListener("click", copyProofPack);
+  els.downloadProofPackBtn.addEventListener("click", downloadProofPack);
   els.accountForm.addEventListener("submit", handleAccountSync);
   els.verifyLoginCodeBtn.addEventListener("click", verifyLoginCode);
   els.signOutBtn.addEventListener("click", signOut);

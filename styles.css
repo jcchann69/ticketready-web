@@ -497,6 +497,75 @@ select:focus-visible {
   line-height: 1.38;
 }
 
+.proof-export-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: #ffffff;
+}
+
+.proof-export-panel.is-pro-active {
+  border-color: rgba(47, 143, 91, 0.44);
+  background: #fbfffd;
+}
+
+.proof-export-panel.is-locked {
+  background: #f8fbfa;
+}
+
+.proof-export__title {
+  align-items: flex-start;
+}
+
+.proof-export__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.proof-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.proof-pack-card {
+  min-width: 0;
+  min-height: 142px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fbfdfc;
+}
+
+.proof-pack-card__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.proof-pack-card strong {
+  display: block;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+  color: var(--teal-dark);
+  font-size: 1rem;
+  line-height: 1.22;
+}
+
+.proof-pack-card p {
+  margin-bottom: 0;
+  color: #334441;
+  font-size: 0.84rem;
+  line-height: 1.38;
+}
+
 .today-plan {
   display: grid;
   gap: 8px;
@@ -1381,6 +1450,10 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .proof-pack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .path-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1403,7 +1476,8 @@ a {
   .workspace-grid,
   .outcome-grid,
   .dashboard-grid,
-  .weekly-report-grid {
+  .weekly-report-grid,
+  .proof-pack-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1491,6 +1565,10 @@ a {
   }
 
   .weekly-report__actions {
+    justify-content: flex-start;
+  }
+
+  .proof-export__actions {
     justify-content: flex-start;
   }
 
