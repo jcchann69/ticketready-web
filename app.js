@@ -1117,6 +1117,12 @@ const els = {
   readinessChecklistBadge: document.querySelector("#readinessChecklistBadge"),
   readinessChecklist: document.querySelector("#readinessChecklist"),
   readinessChecklistCopy: document.querySelector("#readinessChecklistCopy"),
+  drillCoachPanel: document.querySelector("#drillCoachPanel"),
+  drillCoachBadge: document.querySelector("#drillCoachBadge"),
+  drillFocusSkill: document.querySelector("#drillFocusSkill"),
+  drillFocusCopy: document.querySelector("#drillFocusCopy"),
+  drillRecommendations: document.querySelector("#drillRecommendations"),
+  drillCoachBtn: document.querySelector("#drillCoachBtn"),
   pathSummaryBadge: document.querySelector("#pathSummaryBadge"),
   pathSummary: document.querySelector("#pathSummary"),
   pathGrid: document.querySelector("#pathGrid"),
@@ -2009,6 +2015,74 @@ function renderReadinessChecklist() {
   }
 }
 
+function getDrillFocusSkill() {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  const candidates = Array.from(new Set([...careerGoal.skills, ...skillNames]));
+  const careerRank = (skill) => {
+    const index = careerGoal.skills.indexOf(skill);
+    return index >= 0 ? index : careerGoal.skills.length;
+  };
+  return candidates
+    .slice()
+    .sort((first, second) => {
+      const firstValue = Number(progress.skills[first] || 0);
+      const secondValue = Number(progress.skills[second] || 0);
+      return firstValue - secondValue || careerRank(first) - careerRank(second);
+    })[0] || careerGoal.skills[0];
+}
+
+function getDrillRecommendations(focusSkill, limit = 3) {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  const focusSkills = Array.from(new Set([focusSkill, ...careerGoal.skills]));
+  return getAvailableTicketIndexes()
+    .map((index) => {
+      const ticket = tickets[index];
+      const directSkillMatch = ticket.skills.includes(focusSkill) ? 8 : 0;
+      return {
+        index,
+        ticket,
+        score: getTicketMatchScore(ticket, focusSkills) + directSkillMatch,
+      };
+    })
+    .sort((first, second) => second.score - first.score || first.index - second.index)
+    .slice(0, limit);
+}
+
+function renderDrillCoach() {
+  const focusSkill = getDrillFocusSkill();
+  const skillValue = Math.round(Number(progress.skills[focusSkill] || 0));
+  const recommendations = getDrillRecommendations(focusSkill);
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  const firstRecommendation = recommendations[0];
+
+  els.drillCoachPanel.classList.toggle("is-pro-active", proActive);
+  els.drillCoachBadge.textContent = proActive ? "Adaptive" : "Preview";
+  els.drillFocusSkill.textContent = focusSkill;
+  els.drillFocusCopy.textContent = progress.solved
+    ? `${focusSkill} is at ${skillValue}%. Train it next for your ${careerGoal.label} path.`
+    : `${focusSkill} is important for ${careerGoal.label}. Start with one focused drill to establish your baseline.`;
+  els.drillCoachBtn.textContent = firstRecommendation ? `Train ${firstRecommendation.ticket.id}` : "Start Drill";
+  els.drillCoachBtn.dataset.drillTicket = String(firstRecommendation?.index ?? getRecommendedTicketIndex());
+  els.drillRecommendations.replaceChildren();
+
+  recommendations.forEach(({ index, ticket }, itemIndex) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "drill-ticket";
+    item.dataset.drillTicket = String(index);
+
+    const top = document.createElement("div");
+    top.className = "drill-ticket__top";
+    top.append(createTextElement("span", `Drill ${itemIndex + 1}`));
+    top.append(createTextElement("strong", ticket.id));
+
+    item.append(top);
+    item.append(createTextElement("span", ticket.title, "drill-ticket__title"));
+    item.append(createTextElement("span", `${ticket.priority} - ${ticket.skills.join(", ")}`, "drill-ticket__meta"));
+    els.drillRecommendations.append(item);
+  });
+}
+
 function getWeeklyEvidence() {
   const weekMs = 7 * 24 * 60 * 60 * 1000;
   const now = Date.now();
@@ -2340,6 +2414,7 @@ function renderProDashboard() {
   renderTodayPlan();
   renderEvidenceVault();
   renderReadinessChecklist();
+  renderDrillCoach();
   renderWeeklyReport();
   renderProofPack();
   renderMockInterviewCoach();
@@ -2709,6 +2784,23 @@ function handleMissionCta() {
 
   loadTicket(getRecommendedTicketIndex());
   document.querySelector(".training-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function startDrillTicket(index) {
+  const ticketIndex = Number(index);
+  if (Number.isFinite(ticketIndex)) {
+    loadTicket(ticketIndex);
+  } else {
+    loadTicket(getRecommendedTicketIndex());
+  }
+  document.querySelector(".training-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function handleDrillCoachClick(event) {
+  const button = event.target.closest("[data-drill-ticket]");
+  if (button) {
+    startDrillTicket(button.dataset.drillTicket);
+  }
 }
 
 function updateSla() {
@@ -3114,6 +3206,8 @@ function bindEvents() {
   els.copyProofPackBtn.addEventListener("click", copyProofPack);
   els.downloadProofPackBtn.addEventListener("click", downloadProofPack);
   els.missionCtaBtn.addEventListener("click", handleMissionCta);
+  els.drillCoachBtn.addEventListener("click", handleDrillCoachClick);
+  els.drillRecommendations.addEventListener("click", handleDrillCoachClick);
   els.scoreInterviewBtn.addEventListener("click", scoreInterviewAnswer);
   els.copyInterviewAnswerBtn.addEventListener("click", copyInterviewAnswer);
   els.accountForm.addEventListener("submit", handleAccountSync);
