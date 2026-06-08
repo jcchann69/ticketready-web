@@ -339,6 +339,84 @@ textarea:focus-visible {
   display: none;
 }
 
+.career-goal-strip {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #ffffff;
+}
+
+.career-goal-strip__copy {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.career-goal-strip__copy h3 {
+  margin-bottom: 0;
+  color: var(--teal-dark);
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.career-goal-strip__copy p {
+  margin-bottom: 0;
+  color: #334441;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.career-goal-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.goal-option {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  min-height: 82px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  cursor: pointer;
+  text-align: left;
+  background: #f8fbfa;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.goal-option:hover {
+  border-color: rgba(11, 124, 119, 0.46);
+  background: #ffffff;
+}
+
+.goal-option.is-active {
+  border-color: rgba(11, 124, 119, 0.7);
+  background: #effaf7;
+  box-shadow: inset 0 0 0 1px rgba(11, 124, 119, 0.18);
+}
+
+.goal-option strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.goal-option span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.15fr repeat(3, minmax(0, 1fr));
@@ -1574,6 +1652,14 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
+  .career-goal-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .career-goal-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .weekly-report-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1612,6 +1698,7 @@ a {
   .workspace-grid,
   .outcome-grid,
   .dashboard-grid,
+  .career-goal-options,
   .weekly-report-grid,
   .proof-pack-grid,
   .interview-coach-grid {
@@ -1682,6 +1769,7 @@ a {
   .panel-heading,
   .ticket-topline,
   .dashboard-hero,
+  .career-goal-strip,
   .account-strip {
     display: grid;
     grid-template-columns: 1fr;

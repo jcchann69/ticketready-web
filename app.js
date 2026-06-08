@@ -946,6 +946,37 @@ const skillNames = [
   "Windows",
 ];
 
+const careerGoalProfiles = {
+  help_desk: {
+    label: "Help Desk Analyst",
+    shortLabel: "Help Desk",
+    skills: ["SLA", "Documentation", "Communication", "Identity"],
+    plan: "Prioritize clear triage, SLA judgment, safe identity checks, and clean ticket notes.",
+    proof: "help desk readiness",
+  },
+  it_support: {
+    label: "IT Support Specialist",
+    shortLabel: "IT Support",
+    skills: ["Troubleshooting", "Access", "SaaS", "Windows"],
+    plan: "Prioritize practical troubleshooting, SaaS access, Windows issues, and user confirmation.",
+    proof: "IT support readiness",
+  },
+  desktop_support: {
+    label: "Desktop Support",
+    shortLabel: "Desktop",
+    skills: ["Hardware", "Windows", "Troubleshooting", "Communication"],
+    plan: "Prioritize device intake, Windows evidence, user communication, and verified fixes.",
+    proof: "desktop support readiness",
+  },
+  security_support: {
+    label: "Security-Minded Support",
+    shortLabel: "Security",
+    skills: ["Security", "Identity", "Documentation", "Escalation"],
+    plan: "Prioritize containment, identity safety, documentation, and escalation discipline.",
+    proof: "security-minded support readiness",
+  },
+};
+
 const FREE_TICKET_LIMIT = 6;
 
 const trainingPath = [
@@ -1067,6 +1098,9 @@ const els = {
   dashboardBadge: document.querySelector("#dashboardBadge"),
   dashboardWelcome: document.querySelector("#dashboardWelcome"),
   dashboardReadiness: document.querySelector("#dashboardReadiness"),
+  careerGoalTitle: document.querySelector("#careerGoalTitle"),
+  careerGoalCopy: document.querySelector("#careerGoalCopy"),
+  careerGoalOptions: document.querySelector("#careerGoalOptions"),
   rampDayBadge: document.querySelector("#rampDayBadge"),
   todayPlan: document.querySelector("#todayPlan"),
   dashboardPrimaryBtn: document.querySelector("#dashboardPrimaryBtn"),
@@ -1129,11 +1163,20 @@ let proofPackText = "";
 
 const progress = loadProgress();
 
+function sanitizeCareerGoal(value) {
+  return careerGoalProfiles[value] ? value : "help_desk";
+}
+
+function getCareerGoalProfile(value) {
+  return careerGoalProfiles[sanitizeCareerGoal(value)] || careerGoalProfiles.help_desk;
+}
+
 function getEmptyProgress() {
   return {
     xp: 0,
     solved: 0,
     best: 0,
+    careerGoal: "help_desk",
     scores: [],
     skills: Object.fromEntries(skillNames.map((skill) => [skill, 0])),
     evidence: [],
@@ -1147,6 +1190,7 @@ function normalizeProgressRecord(saved = {}) {
     xp: Number(saved.xp || 0),
     solved: Number(saved.solved || 0),
     best: Number(saved.best || 0),
+    careerGoal: sanitizeCareerGoal(saved.careerGoal),
     scores: Array.isArray(saved.scores) ? saved.scores.slice(-20).map((score) => Number(score || 0)) : [],
     skills: { ...empty.skills, ...(saved.skills || {}) },
     evidence: Array.isArray(saved.evidence) ? saved.evidence.slice(0, 20) : [],
@@ -1224,6 +1268,11 @@ function mergeProgressRecords(localProgress, remoteProgress) {
     xp: Math.max(localRecord.xp, remoteRecord.xp),
     solved: Math.max(localRecord.solved, remoteRecord.solved),
     best: Math.max(localRecord.best, remoteRecord.best),
+    careerGoal: sanitizeCareerGoal(
+      localProgress?.careerGoal && localProgress.careerGoal !== "help_desk"
+        ? localProgress.careerGoal
+        : remoteProgress?.careerGoal || localProgress?.careerGoal
+    ),
     scores: [...remoteRecord.scores, ...localRecord.scores].slice(-20),
     skills,
     evidence: Array.from(evidenceMap.values())
@@ -1240,6 +1289,7 @@ function applyProgress(nextProgress) {
   progress.xp = cleanProgress.xp;
   progress.solved = cleanProgress.solved;
   progress.best = cleanProgress.best;
+  progress.careerGoal = cleanProgress.careerGoal;
   progress.scores = cleanProgress.scores;
   progress.skills = cleanProgress.skills;
   progress.evidence = cleanProgress.evidence;
@@ -1284,6 +1334,7 @@ function getReadinessMilestones() {
   const recentAverage = getAverageScore(5);
   const strongEvidence = progress.evidence.filter((entry) => Number(entry.score || 0) >= 80).length;
   const interviewReps = progress.interviews.length;
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
 
   return [
     {
@@ -1305,8 +1356,8 @@ function getReadinessMilestones() {
       complete: progress.evidence.length >= 3,
     },
     {
-      label: "Practice 4 skill areas",
-      detail: "Avoid looking strong in only one ticket type.",
+      label: `Practice ${careerGoal.shortLabel} skills`,
+      detail: `Cover ${careerGoal.skills.slice(0, 3).join(", ")} and one extra support area.`,
       value: `${Math.min(skillCoverage, 4)}/4`,
       complete: skillCoverage >= 4,
     },
@@ -1338,6 +1389,44 @@ function createTextElement(tag, text, className) {
     element.className = className;
   }
   return element;
+}
+
+function renderCareerGoalSelector() {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  els.careerGoalTitle.textContent = careerGoal.label;
+  els.careerGoalCopy.textContent = `${careerGoal.plan} Focus skills: ${careerGoal.skills.join(", ")}.`;
+  els.careerGoalOptions.replaceChildren();
+
+  Object.entries(careerGoalProfiles).forEach(([id, profile]) => {
+    const button = document.createElement("button");
+    const isActive = sanitizeCareerGoal(progress.careerGoal) === id;
+    button.type = "button";
+    button.className = `goal-option${isActive ? " is-active" : ""}`;
+    button.dataset.careerGoal = id;
+    button.setAttribute("aria-pressed", String(isActive));
+    button.append(createTextElement("strong", profile.label));
+    button.append(createTextElement("span", profile.skills.slice(0, 3).join(" / ")));
+    els.careerGoalOptions.append(button);
+  });
+}
+
+function setCareerGoal(value) {
+  const nextGoal = sanitizeCareerGoal(value);
+  if (nextGoal === progress.careerGoal) {
+    return;
+  }
+
+  progress.careerGoal = nextGoal;
+  saveProgress();
+  renderStats();
+  renderQueue();
+  els.planSummaryCopy.textContent = proActive
+    ? `Your Pro outcome tools are unlocked for ${getCareerGoalProfile(progress.careerGoal).label} practice.`
+    : `Practice, proof, and interview confidence for ${getCareerGoalProfile(progress.careerGoal).label}.`;
+  renderAccountSync(isSignedIn() ? "Saving target role..." : "Target role saved on this device");
+  if (isSignedIn()) {
+    syncProgressToAccount("Saving target role...");
+  }
 }
 
 function renderStats() {
@@ -1374,7 +1463,13 @@ function getCurrentPathDayIndex() {
 }
 
 function getCurrentPathSkills() {
-  return pathSkillMap[getCurrentPathDayIndex()] || ["Mixed"];
+  const pathSkills = pathSkillMap[getCurrentPathDayIndex()] || ["Mixed"];
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  if (pathSkills.includes("Mixed")) {
+    return careerGoal.skills;
+  }
+
+  return Array.from(new Set([...pathSkills, ...careerGoal.skills.slice(0, 2)]));
 }
 
 function getTicketMatchScore(ticket, pathSkills) {
@@ -1564,7 +1659,8 @@ function buildEvidenceSummary(ticket, result) {
 }
 
 function buildInterviewPrompt(ticket) {
-  return `Tell me about ${ticket.title}. Explain the business impact, why you chose ${ticket.priority}, your first safe action, and how you documented the outcome.`;
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  return `For a ${careerGoal.label} interview, tell me about ${ticket.title}. Explain the business impact, why you chose ${ticket.priority}, your first safe action, and how you documented the outcome.`;
 }
 
 function getCurrentInterviewQuestion() {
@@ -1711,14 +1807,17 @@ function renderTodayPlan() {
   const weakestSkill = getWeakestSkill();
   const pathDay = trainingPath[Math.min(trainingPath.length - 1, progress.solved)];
   const nextMilestone = getReadinessMilestones().find((item) => !item.complete);
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
   const plan = proActive
     ? [
+        `${careerGoal.shortLabel}: ${careerGoal.plan}`,
         `${pathDay.title}: ${pathDay.focus}`,
         `${pathDay.tickets}. Score 80+ on ${ticket.id} if you can.`,
         `${pathDay.evidence} Then rehearse one answer about ${weakestSkill}.`,
         nextMilestone ? `Checklist target: ${nextMilestone.label}.` : "Checklist complete. Keep your evidence fresh.",
       ]
     : [
+        `Target role: ${careerGoal.label}.`,
         `${trainingPath[0].title}: ${trainingPath[0].focus}`,
         `Try ${ticket.id} as the Day 1 preview ticket.`,
         nextMilestone ? `Preview target: ${nextMilestone.label}.` : "Your proof pack is ready for review.",
@@ -1733,11 +1832,12 @@ function renderTodayPlan() {
 function renderTrainingPath() {
   const completedDays = Math.min(30, progress.solved);
   const activeDay = Math.min(30, Math.max(1, progress.solved + 1));
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
 
   els.pathSummaryBadge.textContent = proActive ? `${completedDays}/30 complete` : "Day 1 preview";
   els.pathSummary.textContent = proActive
-    ? `You are on Day ${activeDay}. Complete each daily ticket set, save evidence, and keep raising readiness.`
-    : "Free users can preview Day 1. Pro unlocks the full 30-day ramp with daily tickets, evidence prompts, and interview practice.";
+    ? `You are training toward ${careerGoal.label}. Day ${activeDay} keeps your daily ticket set, evidence, and interview practice focused.`
+    : `Free users can preview Day 1 for ${careerGoal.label}. Pro unlocks the full 30-day ramp with daily tickets, evidence prompts, and interview practice.`;
   els.pathGrid.replaceChildren();
 
   trainingPath.forEach((item) => {
@@ -1841,6 +1941,7 @@ function getWeeklyEvidence() {
 }
 
 function getSkillSummary() {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
   const practicedSkills = Object.entries(progress.skills).filter(([, value]) => Number(value) > 0);
   const strongSkills = practicedSkills
     .slice()
@@ -1854,7 +1955,7 @@ function getSkillSummary() {
     .map(([skill]) => skill);
 
   return {
-    strongSkills: strongSkills.length ? strongSkills : ["Triage"],
+    strongSkills: strongSkills.length ? strongSkills : careerGoal.skills.slice(0, 3),
     weakSkills,
   };
 }
@@ -1883,14 +1984,15 @@ function getTopEvidence(limit = 5) {
     .slice(0, limit);
 }
 
-function formatResumeBullet(entry) {
+function formatResumeBullet(entry, careerGoal = getCareerGoalProfile(progress.careerGoal)) {
   const title = entry.title || "service desk support case";
   const score = Number(entry.score || 0);
-  return `TicketReady training project: resolved simulated service desk case "${title}" with a ${score}/100 score, documenting impact, safe action path, and user confirmation.`;
+  return `TicketReady ${careerGoal.proof} project: resolved simulated service desk case "${title}" with a ${score}/100 score, documenting impact, safe action path, and user confirmation.`;
 }
 
 function buildProofPack() {
   const readiness = calculateReadiness();
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
   const topEvidence = getTopEvidence(5);
   const { strongSkills, weakSkills } = getSkillSummary();
   const topInterview = progress.interviews.slice().sort((first, second) => Number(second.score || 0) - Number(first.score || 0))[0];
@@ -1898,10 +2000,11 @@ function buildProofPack() {
     .map((entry) => entry.interviewPrompt)
     .filter(Boolean)
     .slice(0, 3);
-  const resumeBullets = topEvidence.map(formatResumeBullet).slice(0, 5);
+  const resumeBullets = topEvidence.map((entry) => formatResumeBullet(entry, careerGoal)).slice(0, 5);
   const nextFocus = weakSkills[0] || getWeakestSkill();
 
   return {
+    careerGoal,
     topEvidence,
     resumeBullets,
     interviewPrompts,
@@ -1913,6 +2016,8 @@ function buildProofPack() {
       "TicketReady Training Proof Pack",
       "Use this honestly under a resume Projects, Training, or Portfolio section.",
       "",
+      `Target role: ${careerGoal.label}`,
+      `Target role focus: ${careerGoal.skills.join(", ")}`,
       `Readiness: ${readiness}%`,
       `Tickets completed: ${progress.solved}`,
       `Best score: ${progress.best}/100`,
@@ -1948,6 +2053,7 @@ function createProofCard(label, value, detail) {
 function buildWeeklyReport() {
   const evidence = getWeeklyEvidence();
   const readiness = calculateReadiness();
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
   const averageScore = evidence.length
     ? Math.round(evidence.reduce((sum, entry) => sum + Number(entry.score || 0), 0) / evidence.length)
     : 0;
@@ -1960,6 +2066,7 @@ function buildWeeklyReport() {
 
   return {
     evidence,
+    careerGoal,
     readiness,
     averageScore,
     strongestEvidence,
@@ -1970,12 +2077,14 @@ function buildWeeklyReport() {
     text: [
       `TicketReady Weekly Readiness Report`,
       `Week: ${getWeekRangeLabel()}`,
+      `Target role: ${careerGoal.label}`,
       `Tickets completed: ${evidence.length}`,
       `Readiness: ${readiness}%`,
       `Average score: ${averageScore || "No scored tickets yet"}`,
       `Strongest evidence: ${strongestEvidence ? `${strongestEvidence.ticketId} - ${strongestEvidence.title} (${strongestEvidence.score}/100)` : "Complete a scored ticket to create evidence."}`,
       `Strong skills: ${strongSkills.join(", ")}`,
       `Next focus: ${nextFocus}`,
+      `Target role plan: ${careerGoal.plan}`,
       `Interview drill: ${interviewPrompt}`,
     ].join("\n"),
   };
@@ -1993,7 +2102,7 @@ function renderWeeklyReport() {
     els.weeklyReportBody.append(
       createReportCard("Weekly summary", "Pro", "Unlock the report that turns scored tickets into job-readiness proof."),
       createReportCard("Evidence", "Saved", "See your strongest cases, score trend, and reusable interview prompt."),
-      createReportCard("Next focus", "Guided", "The app points you toward weak skills for the next shift.")
+      createReportCard("Target role", getCareerGoalProfile(progress.careerGoal).shortLabel, "Reports adjust to your selected job path.")
     );
     els.weeklyReportStatus.textContent = "Subscribe to unlock weekly summaries built from your completed tickets.";
     return;
@@ -2004,8 +2113,8 @@ function renderWeeklyReport() {
   els.weeklyReportBadge.textContent = report.evidence.length ? `${report.evidence.length} tickets` : "Ready";
   els.copyWeeklyReportBtn.disabled = !report.evidence.length;
   els.weeklyReportBody.append(
-    createReportCard("Week", getWeekRangeLabel(), `${report.evidence.length} scored tickets included in this summary.`),
-    createReportCard("Average Score", report.averageScore ? `${report.averageScore}/100` : "Start", `${report.readiness}% overall readiness.`),
+    createReportCard("Week", getWeekRangeLabel(), `${report.evidence.length} scored tickets. ${report.averageScore ? `${report.averageScore}/100 average` : "Start scoring tickets"} with ${report.readiness}% readiness.`),
+    createReportCard("Target Role", report.careerGoal.shortLabel, report.careerGoal.plan),
     createReportCard(
       "Strongest Evidence",
       report.strongestEvidence ? `${report.strongestEvidence.ticketId}` : "None yet",
@@ -2033,7 +2142,7 @@ function renderProofPack() {
     els.proofPackBody.append(
       createProofCard("Resume bullets", "Pro", "Export honest training bullets from your strongest scored tickets."),
       createProofCard("Interview prep", "Stories", "Turn simulated cases into answer prompts about impact, action, and documentation."),
-      createProofCard("Skill proof", "Tracked", "Show your best skills and the next gap to train before interviews.")
+      createProofCard("Target role", getCareerGoalProfile(progress.careerGoal).shortLabel, "Proof language adapts to the role you are chasing.")
     );
     els.proofPackStatus.textContent = "Subscribe to export resume/project bullets from your saved training evidence.";
     return;
@@ -2053,7 +2162,7 @@ function renderProofPack() {
     createProofCard(
       "Skill Summary",
       proofPack.strongSkills.join(", "),
-      `Next focus: ${proofPack.nextFocus}. Readiness: ${proofPack.readiness}%.`
+      `${proofPack.careerGoal.shortLabel} focus: ${proofPack.nextFocus}. Readiness: ${proofPack.readiness}%.`
     )
   );
 
@@ -2127,6 +2236,7 @@ function renderProDashboard() {
   const rampDay = Math.min(30, Math.max(1, progress.solved + 1));
   const completedRampDays = Math.min(30, progress.solved);
   const latestEvidence = progress.evidence[0];
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
   const recommendedTicketIndex = getQueueTicketIndexes()[0] ?? activeTicketIndex;
   const recommendedTicket = tickets[recommendedTicketIndex];
 
@@ -2134,8 +2244,8 @@ function renderProDashboard() {
   els.dashboardBadge.textContent = proActive ? "Pro Active" : "Free Preview";
   els.dashboardBadge.classList.toggle("is-active", proActive);
   els.dashboardWelcome.textContent = proActive
-    ? "Your paid workspace is ready. Finish today's shift, save proof, and rehearse one interview answer."
-    : "Unlock Pro to turn practice tickets into a weekly job-readiness routine with evidence you can reuse.";
+    ? `Your ${careerGoal.shortLabel} workspace is ready. Finish today's shift, save proof, and rehearse one interview answer.`
+    : `Choose a target role like ${careerGoal.label}, then unlock Pro for a weekly job-readiness routine with evidence you can reuse.`;
   els.dashboardReadiness.textContent = `${readiness}%`;
   els.rampDayBadge.textContent = `Day ${rampDay}`;
   els.rampFill.style.width = `${Math.round((completedRampDays / 30) * 100)}%`;
@@ -2145,6 +2255,7 @@ function renderProDashboard() {
     : `Practice explaining why ${recommendedTicket.title} is a ${recommendedTicket.priority} and what you would do first.`;
   els.dashboardPrimaryBtn.textContent = proActive ? "Start Today's Shift" : "Unlock Pro";
 
+  renderCareerGoalSelector();
   renderTodayPlan();
   renderEvidenceVault();
   renderReadinessChecklist();
@@ -2155,13 +2266,14 @@ function renderProDashboard() {
 }
 
 function renderProState(email = localStorage.getItem("ticketReadyLastEmail") || "") {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
   els.proStatusBadge.textContent = proActive ? "Pro Active" : "Free";
   els.proStatusBadge.classList.toggle("is-active", proActive);
   els.subscriptionPanel.classList.toggle("is-pro-active", proActive);
   els.valueLab.classList.toggle("is-unlocked", proActive);
   els.planSummaryCopy.textContent = proActive
-    ? "Your Pro outcome tools are unlocked on this device."
-    : "Practice, proof, and interview confidence every week.";
+    ? `Your Pro outcome tools are unlocked for ${careerGoal.label} practice.`
+    : `Practice, proof, and interview confidence for ${careerGoal.label}.`;
 
   if (email && !els.emailInput.value) {
     els.emailInput.value = email;
@@ -2902,6 +3014,12 @@ function bindEvents() {
   els.accountForm.addEventListener("submit", handleAccountSync);
   els.verifyLoginCodeBtn.addEventListener("click", verifyLoginCode);
   els.signOutBtn.addEventListener("click", signOut);
+  els.careerGoalOptions.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-career-goal]");
+    if (button) {
+      setCareerGoal(button.dataset.careerGoal);
+    }
+  });
   els.loginCodeInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();

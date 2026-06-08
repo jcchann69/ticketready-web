@@ -48,6 +48,7 @@ const progressSkillNames = [
   "SaaS",
   "Windows",
 ];
+const careerGoalIds = new Set(["help_desk", "it_support", "desktop_support", "security_support"]);
 
 let stripeClient = null;
 let stripeClientKey = "";
@@ -506,6 +507,11 @@ function limitText(value, maxLength = 280) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
+function sanitizeCareerGoal(value, fallback = "help_desk") {
+  const careerGoal = limitText(value, 40);
+  return careerGoalIds.has(careerGoal) ? careerGoal : fallback;
+}
+
 function clampNumber(value, min, max) {
   const number = Number(value);
   if (!Number.isFinite(number)) {
@@ -519,6 +525,7 @@ function createEmptyProgress() {
     xp: 0,
     solved: 0,
     best: 0,
+    careerGoal: "help_desk",
     scores: [],
     skills: Object.fromEntries(progressSkillNames.map((skill) => [skill, 0])),
     evidence: [],
@@ -565,6 +572,7 @@ function sanitizeProgress(input = {}) {
     xp: Math.round(clampNumber(input.xp, 0, 1000000)),
     solved: Math.round(clampNumber(input.solved, 0, 10000)),
     best: Math.round(clampNumber(input.best, 0, 100)),
+    careerGoal: sanitizeCareerGoal(input.careerGoal, empty.careerGoal),
     scores: Array.isArray(input.scores)
       ? input.scores.slice(-20).map((score) => Math.round(clampNumber(score, 0, 100)))
       : [],
@@ -577,6 +585,7 @@ function sanitizeProgress(input = {}) {
 function mergeProgress(existing = {}, incoming = {}) {
   const saved = sanitizeProgress(existing);
   const next = sanitizeProgress(incoming);
+  const nextCareerGoal = sanitizeCareerGoal(incoming.careerGoal, "");
   const skills = { ...saved.skills };
   Object.entries(next.skills).forEach(([skill, value]) => {
     skills[skill] = Math.max(skills[skill] || 0, value);
@@ -602,6 +611,7 @@ function mergeProgress(existing = {}, incoming = {}) {
     xp: Math.max(saved.xp, next.xp),
     solved: Math.max(saved.solved, next.solved),
     best: Math.max(saved.best, next.best),
+    careerGoal: nextCareerGoal || saved.careerGoal,
     scores: [...saved.scores, ...next.scores].slice(-20),
     skills,
     evidence: Array.from(evidenceMap.values())
