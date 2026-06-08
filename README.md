@@ -11,6 +11,7 @@ TicketReady is a playable website prototype for a service desk training game. It
 - Pro-style Job Evidence Lab with resume proof, interview prompts, and next-drill recommendations
 - Job-ready checklist that turns scores, evidence, skill coverage, and consistency into visible learner milestones
 - Target-role personalization for Help Desk, IT Support, Desktop Support, and Security-minded Support paths
+- First-session mission launcher that tells new users exactly what to do next
 - Resume proof export that copies or downloads honest training bullets from saved simulated tickets
 - Mock interview answer coach with saved reps and structure scoring
 - Creator Clip panel for short-form video hooks

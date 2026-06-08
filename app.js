@@ -1101,6 +1101,11 @@ const els = {
   careerGoalTitle: document.querySelector("#careerGoalTitle"),
   careerGoalCopy: document.querySelector("#careerGoalCopy"),
   careerGoalOptions: document.querySelector("#careerGoalOptions"),
+  startMission: document.querySelector("#startMission"),
+  startMissionTitle: document.querySelector("#startMissionTitle"),
+  startMissionCopy: document.querySelector("#startMissionCopy"),
+  missionSteps: document.querySelector("#missionSteps"),
+  missionCtaBtn: document.querySelector("#missionCtaBtn"),
   rampDayBadge: document.querySelector("#rampDayBadge"),
   todayPlan: document.querySelector("#todayPlan"),
   dashboardPrimaryBtn: document.querySelector("#dashboardPrimaryBtn"),
@@ -1426,6 +1431,81 @@ function setCareerGoal(value) {
   renderAccountSync(isSignedIn() ? "Saving target role..." : "Target role saved on this device");
   if (isSignedIn()) {
     syncProgressToAccount("Saving target role...");
+  }
+}
+
+function getRecommendedTicketIndex() {
+  return getQueueTicketIndexes()[0] ?? activeTicketIndex;
+}
+
+function getFirstSessionSteps(recommendedTicket) {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  return [
+    {
+      label: "Target role selected",
+      detail: careerGoal.label,
+      complete: true,
+    },
+    {
+      label: "Finish one realistic case",
+      detail: `${recommendedTicket.id}: ${recommendedTicket.title}`,
+      complete: progress.solved >= 1,
+    },
+    {
+      label: "Save one proof entry",
+      detail: progress.evidence.length ? `${progress.evidence[0].ticketId} saved` : "Score a ticket to create resume evidence.",
+      complete: progress.evidence.length >= 1,
+    },
+    {
+      label: "Practice one interview answer",
+      detail: proActive ? "Use the Answer Coach after your first saved case." : "Pro unlocks scored answer coaching.",
+      complete: progress.interviews.length >= 1,
+      locked: !proActive,
+    },
+  ];
+}
+
+function renderStartMission() {
+  const careerGoal = getCareerGoalProfile(progress.careerGoal);
+  const recommendedTicket = tickets[getRecommendedTicketIndex()];
+  const steps = getFirstSessionSteps(recommendedTicket);
+  const nextStep = steps.find((step) => !step.complete) || steps[steps.length - 1];
+
+  els.startMission.classList.toggle("is-complete", steps.every((step) => step.complete));
+  els.startMissionTitle.textContent = progress.solved
+    ? `Keep building ${careerGoal.shortLabel} proof`
+    : `Start your ${careerGoal.shortLabel} shift`;
+  els.startMissionCopy.textContent = `${recommendedTicket.id} is your next recommended case: ${recommendedTicket.title}. Next checkpoint: ${nextStep.label}.`;
+  els.missionSteps.replaceChildren();
+
+  steps.forEach((step, index) => {
+    const item = document.createElement("div");
+    item.className = [
+      "mission-step",
+      step.complete ? "is-complete" : "",
+      step.locked && !step.complete ? "is-locked" : "",
+    ].filter(Boolean).join(" ");
+    item.append(createTextElement("span", step.complete ? "OK" : String(index + 1), "mission-step__mark"));
+    const body = document.createElement("div");
+    body.className = "mission-step__body";
+    body.append(createTextElement("strong", step.label));
+    body.append(createTextElement("span", step.detail));
+    item.append(body);
+    els.missionSteps.append(item);
+  });
+
+  if (!progress.solved || !progress.evidence.length) {
+    els.missionCtaBtn.textContent = `Start ${recommendedTicket.id}`;
+    els.missionCtaBtn.dataset.missionTarget = "ticket";
+  } else if (!proActive) {
+    els.missionCtaBtn.textContent = "Unlock Pro Tools";
+    els.missionCtaBtn.dataset.missionTarget = "subscribe";
+  } else if (!progress.interviews.length) {
+    els.missionCtaBtn.textContent = "Practice Interview";
+    els.missionCtaBtn.dataset.missionTarget = "interview";
+  } else {
+    els.missionCtaBtn.textContent = "Open Proof Pack";
+    els.missionCtaBtn.dataset.missionTarget = "proof";
   }
 }
 
@@ -1802,7 +1882,7 @@ function getWeakestSkill() {
 }
 
 function renderTodayPlan() {
-  const recommendedTicketIndex = getQueueTicketIndexes()[0] ?? activeTicketIndex;
+  const recommendedTicketIndex = getRecommendedTicketIndex();
   const ticket = tickets[recommendedTicketIndex];
   const weakestSkill = getWeakestSkill();
   const pathDay = trainingPath[Math.min(trainingPath.length - 1, progress.solved)];
@@ -2237,7 +2317,7 @@ function renderProDashboard() {
   const completedRampDays = Math.min(30, progress.solved);
   const latestEvidence = progress.evidence[0];
   const careerGoal = getCareerGoalProfile(progress.careerGoal);
-  const recommendedTicketIndex = getQueueTicketIndexes()[0] ?? activeTicketIndex;
+  const recommendedTicketIndex = getRecommendedTicketIndex();
   const recommendedTicket = tickets[recommendedTicketIndex];
 
   els.proDashboard.classList.toggle("is-pro-active", proActive);
@@ -2256,6 +2336,7 @@ function renderProDashboard() {
   els.dashboardPrimaryBtn.textContent = proActive ? "Start Today's Shift" : "Unlock Pro";
 
   renderCareerGoalSelector();
+  renderStartMission();
   renderTodayPlan();
   renderEvidenceVault();
   renderReadinessChecklist();
@@ -2605,6 +2686,29 @@ function chooseRandomTicket() {
     nextIndex = queueIndexes[Math.floor(Math.random() * queueIndexes.length)];
   }
   loadTicket(nextIndex);
+}
+
+function handleMissionCta() {
+  const target = els.missionCtaBtn.dataset.missionTarget || "ticket";
+  if (target === "subscribe") {
+    document.querySelector(".subscription-panel").scrollIntoView({ behavior: "smooth", block: "center" });
+    els.emailInput.focus();
+    return;
+  }
+
+  if (target === "interview") {
+    els.interviewCoachPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+    els.mockInterviewAnswer.focus();
+    return;
+  }
+
+  if (target === "proof") {
+    els.proofExportPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  loadTicket(getRecommendedTicketIndex());
+  document.querySelector(".training-panel").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function updateSla() {
@@ -3009,6 +3113,7 @@ function bindEvents() {
   els.copyWeeklyReportBtn.addEventListener("click", copyWeeklyReport);
   els.copyProofPackBtn.addEventListener("click", copyProofPack);
   els.downloadProofPackBtn.addEventListener("click", downloadProofPack);
+  els.missionCtaBtn.addEventListener("click", handleMissionCta);
   els.scoreInterviewBtn.addEventListener("click", scoreInterviewAnswer);
   els.copyInterviewAnswerBtn.addEventListener("click", copyInterviewAnswer);
   els.accountForm.addEventListener("submit", handleAccountSync);
