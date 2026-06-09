@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-app-icons.ps1",
     "configure:stripe": "powershell -ExecutionPolicy Bypass -File scripts/configure-stripe.ps1",
     "setup:stripe": "node scripts/setup-stripe.js"
   },

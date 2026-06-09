@@ -3,8 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Practice realistic service desk tickets and build job-ready support instincts with TicketReady." />
+    <meta name="theme-color" content="#101625" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TicketReady" />
     <title>TicketReady - Service Desk Emulator</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="pwa.js" defer></script>
   </head>
   <body>
     <header class="hero">
@@ -19,6 +29,7 @@
         </div>
         <div class="hero__actions" aria-label="Primary actions">
           <button class="button button--primary" id="startShiftBtn" type="button">Start Shift</button>
+          <button class="button button--secondary" id="installAppBtn" type="button" hidden>Install App</button>
           <button class="button button--ghost" id="creatorModeBtn" type="button">Creator Clip</button>
         </div>
       </div>

@@ -51,6 +51,17 @@ Start with the website because social ads and TikTok links can send users there 
 4. Installable PWA
 5. Native mobile app if retention is strong
 
+## Installable App Version
+
+TicketReady now ships as an installable web app:
+
+- `manifest.webmanifest` defines the app name, icons, start URL, and standalone launch mode.
+- `sw.js` caches the app shell so the product opens like an app and can recover when the network is weak.
+- `pwa.js` registers the service worker and shows an install button on browsers that support one-tap install.
+- iPhone users can install it from Safari with Share > Add to Home Screen.
+
+Use the website/PWA for Stripe subscriptions. A native App Store version should be handled later with Apple's in-app purchase flow for digital subscriptions.
+
 ## Payment Setup
 
 This prototype uses Stripe Checkout Sessions in subscription mode for the website. That is the right first payment path because the social-media funnel sends people to the website first.

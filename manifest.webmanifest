@@ -1,0 +1,48 @@
+{
+  "name": "TicketReady - Service Desk Emulator",
+  "short_name": "TicketReady",
+  "description": "Practice realistic service desk tickets, build job-ready support instincts, and save interview-ready proof.",
+  "id": "/",
+  "start_url": "/?app=1",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#101625",
+  "theme_color": "#101625",
+  "categories": ["education", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/assets/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Shift",
+      "short_name": "Shift",
+      "description": "Open the TicketReady training queue.",
+      "url": "/?app=1",
+      "icons": [
+        {
+          "src": "/assets/app-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

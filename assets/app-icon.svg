@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">TicketReady app icon</title>
+  <desc id="desc">A TicketReady ticket mark on a dark blue background.</desc>
+  <defs>
+    <linearGradient id="bg" x1="72" y1="40" x2="448" y2="472" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827" />
+      <stop offset="0.58" stop-color="#19314f" />
+      <stop offset="1" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="ticket" x1="130" y1="104" x2="384" y2="402" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#e8f2ff" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)" />
+  <path d="M134 132h244c18 0 32 14 32 32v52c-20 0-36 16-36 36s16 36 36 36v52c0 18-14 32-32 32H134c-18 0-32-14-32-32v-52c20 0 36-16 36-36s-16-36-36-36v-52c0-18 14-32 32-32Z" fill="url(#ticket)" />
+  <path d="M170 202h152M170 256h188M170 310h118" stroke="#1d4ed8" stroke-width="22" stroke-linecap="round" />
+  <circle cx="352" cy="309" r="40" fill="#22c55e" />
+  <path d="m331 310 16 16 31-39" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="256" y="438" fill="#dbeafe" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="800" text-anchor="middle">TR</text>
+</svg>
